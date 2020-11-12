@@ -1,0 +1,28 @@
+@import "../variables";
+
+$padding-bottom: 10px;
+
+#help-content-wrapper {
+  max-height: calc(#{$max-screen-height} - #{$navbar-height} - #{$main-content-padding-bottom} - #{$main-content-padding-top} - #{$bottom-height});
+
+  form {
+    height: 100%;
+    padding-bottom: $padding-bottom;
+
+    textarea {
+      height: 100% !important;
+    }
+  }
+}
+
+#help-content-wrapper-offset-holder {
+  display: none;
+  height: calc(100000px - #{$navbar-height} - #{$main-content-padding-bottom} - #{$main-content-padding-top} - #{$bottom-height});
+}
+
+.content-center {
+  .markdown-body {
+    font-family: inherit !important;
+    font-size: inherit !important;
+  }
+}

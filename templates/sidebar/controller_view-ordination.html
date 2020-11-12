@@ -1,0 +1,26 @@
+<div class="sidebar-controllers last">
+    {% include "sidebar/database-picker.html" %}
+    {% include "sidebar/ordination-picker.html" %}
+    {% include "sidebar/viewas-picker.html" %}
+
+    <div class="menu-item">
+        <label>Categorised by</label>
+        <div class="btn-group pull-right">
+            <button type="button" class="btn btn-xs btn-default dropdown-toggle"
+                    data-toggle="dropdown"
+                    data-hover="dropdown">
+                <span id="selected-label-type"></span>
+                <span class="caret"></span>
+            </button>
+            <ul class="dropdown-menu" id="label-type">
+            </ul>
+        </div>
+    </div>
+
+    <div class="input-group row no-margin">
+        <label class="input-group-addon no-padding-left">Render as SVG (slow)</label>
+        <input id="render-as-svg" type="checkbox" class="pull-right"/>
+    </div>
+
+    {% include "sidebar/speed-slider.html" %}
+</div>

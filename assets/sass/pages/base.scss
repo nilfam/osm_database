@@ -1,0 +1,557 @@
+@import "../variables";
+
+html, body {
+  height: 100%;
+  width: 100%;
+  margin: 0;
+  font-family: 'Oxygen', sans-serif;
+  display: flex;
+  font-weight: 500;
+  background-color: white;
+}
+
+a {
+  color: #e72510;
+}
+
+.btn-primary {
+  color: white;
+}
+
+#max-vh {
+  max-height: $max-screen-height;
+}
+
+#content-wrapper {
+  margin: auto;
+  width: 100%;
+  max-height: $max-screen-height;
+  overflow-y: auto;
+}
+
+.main-content {
+  padding: $main-content-padding-top $main-content-padding $main-content-padding-bottom;
+  display: flex;
+  margin: auto;
+  width: 100%;
+  height: 100vh;
+
+  .content-center {
+    color: black;
+    margin: auto;
+    overflow-y: auto;
+    width: 100%;
+  }
+}
+
+.alert-bottom {
+  z-index: 999;
+  position: fixed;
+  width: 100%;
+  bottom: 0;
+  margin-bottom: 0;
+  display: none;
+}
+
+hr {
+  width: 10%;
+  color: black;
+}
+
+.form-group {
+  margin-bottom: 15px;
+}
+
+label {
+  margin-bottom: 10px;
+}
+
+input,
+input::-webkit-input-placeholder {
+  font-size: 11px;
+  padding-top: 3px;
+}
+
+.form-control {
+  height: auto !important;
+  padding: 8px 12px !important;
+  color: black;
+}
+
+.login-button {
+  margin-top: 5px;
+}
+
+.login-register {
+  font-size: 11px;
+  text-align: center;
+}
+
+.form-control, .dropdown-menu {
+  font-size: inherit;
+  line-height: inherit;
+
+  .section-head {
+    line-height: 1.42857;
+    color: white;
+    white-space: nowrap;
+    padding: 5px 10px;
+    background-color: #444;
+    font-weight: bold;
+  }
+}
+
+.navbar-right-most {
+  padding-right: 5px;
+}
+
+.navbar-text {
+  padding: 5px 15px;
+  margin: 0;
+  float: right;
+  line-height: 20px;
+  height: 30px;
+  border-bottom: 2px solid #a91b0c;
+  background-color: white;
+}
+
+.navbar-login {
+  width: 305px;
+  padding: 10px 10px 0px;
+}
+
+.navbar-login-session {
+  padding: 0px 10px;
+}
+
+.has-grid {
+  overflow-y: auto;
+  overflow-x: auto;
+}
+
+/* Start by setting display:none to make this hidden.
+   Then we position it in relation to the viewport window
+   with position:fixed. Width, height, top and left speak
+   speak for themselves. Background we set to 80% white with
+   our animation centered, and no-repeating */
+#loading-spinner-modal {
+  display: none;
+  position: fixed;
+  z-index: 3;
+  top: 0;
+  left: 0;
+  height: 100%;
+  width: 100%;
+}
+
+/* When the body has the loading class, we turn
+   the scrollbar off with overflow:hidden */
+body.loading {
+  overflow: hidden;
+}
+
+/* Anytime the body has the loading class, our
+   modal element will be visible */
+body.loading #loading-spinner-modal {
+  display: block;
+}
+
+.modal-footer {
+  padding: 0;
+  text-align: left;
+
+  .btn-group > .btn:first-child {
+    border-top-left-radius: 0;
+  }
+
+  .btn-group > .btn:last-child {
+    border-top-right-radius: 0;
+  }
+}
+
+.selectize-control {
+  width: 100% !important;
+}
+
+.selectize-control .selectize-input > div {
+  cursor: pointer;
+  margin: auto;
+  padding: 0 6px;
+  color: #ffffff;
+}
+
+.selectize-control .selectize-input [data-value] {
+  text-shadow: 0 1px 0 rgba(0, 51, 83, 0.3);
+  -webkit-border-radius: 3px;
+  -moz-border-radius: 3px;
+  border-radius: 3px;
+  background: #D9230F linear-gradient(#e72510, #D9230F 6%, #cb210e) no-repeat;
+  filter: progid:DXImageTransform.Microsoft.gradient(startColorstr='#ff1da7ee', endColorstr='#ff178ee9', GradientType=0);
+  -webkit-box-shadow: 0 1px 0 rgba(0, 0, 0, 0.2), inset 0 1px rgba(255, 255, 255, 0.03);
+  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.2), inset 0 1px rgba(255, 255, 255, 0.03);
+}
+
+.no-margin {
+  margin: 0;
+}
+
+.no-padding {
+  padding: 0;
+}
+
+.no-padding-left {
+  padding-left: 0;
+}
+
+.no-padding-right {
+  padding-right: 0;
+}
+
+.no-padding-top {
+  padding-top: 0;
+}
+
+.no-padding-bottom {
+  padding-bottom: 0;
+}
+
+@-webkit-keyframes border-blink {
+  from, to {
+    stroke-dasharray: 2 4 4 2 0;
+  }
+  25% {
+    stroke-dasharray: 4 4 2 0 2;
+  }
+  50% {
+    stroke-dasharray: 4 2 0 2 4;
+  }
+  75% {
+    stroke-dasharray: 2 0 2 4 4;
+  }
+}
+
+@keyframes border-blink {
+  10%, 30%, 50%, 70%, 90% {
+    stroke-dasharray: 3 6 3 0;
+  }
+  from, 20%, 40%, 60%, 80%, to {
+    stroke-dasharray: 0 3 6 3;
+  }
+}
+
+.controller-item {
+  display: inline-block;
+
+  & > div {
+    height: $controller-wrapper-child-height;
+    line-height: $controller-wrapper-child-height;
+  }
+}
+
+#menu-opener {
+  width: $menu-opener-width;
+  .fa-bars:before {
+    font-size: $menu-opener-width;
+  }
+
+  .fa-white.fa-bars:before {
+    color: white !important;
+    font-size: unset;
+  }
+}
+
+#menu-closer {
+  width: $menu-closer-width;
+  font-size: 25px;
+}
+
+#content-wrapper.not-toggled {
+  #menu-opener {
+    display: inline-block;
+  }
+  .grid-controller {
+    width: calc(100% - #{$grid-status-width} - #{$menu-opener-width} - #{$menu-opener-padding-left});
+    padding-left: 20px;
+    &.no-status {
+      width: calc(100% - #{$menu-opener-width} - #{$menu-opener-padding-left});
+    }
+  }
+}
+
+#content-wrapper.toggled {
+  #menu-opener {
+    display: none;
+  }
+  .grid-controller {
+    width: calc(100% - #{$grid-status-width});
+    padding-left: 20px;
+    &.no-status {
+      width: 100%;
+    }
+  }
+}
+
+.controller-wrapper {
+  height: $controller-wrapper-height;
+  padding-top: 3px;
+  & > div {
+    display: inline-block;
+    margin-left: 0;
+
+    &:last-child {
+      margin-left: -8px;
+    }
+
+    & > div {
+      height: $controller-wrapper-child-height;
+      line-height: $controller-wrapper-child-height;
+    }
+  }
+
+  .input-group-addon {
+    padding: 0;
+
+    &.left {
+      padding: 0 10px 0 0;
+    }
+    &.right {
+      padding: 0 0 0 10px;
+    }
+
+  }
+
+  #grid-status {
+    width: $grid-status-width;
+    text-align: left;
+
+    .input-group-addon {
+      text-align: left;
+    }
+  }
+
+  .slider-group {
+    width: $slider-group-width;
+  }
+}
+
+.slider-selection {
+  background: #d9230f7a;
+}
+
+.grid-filter {
+  border: 0;
+  padding: 0 !important;
+  box-shadow: none !important;
+  background-color: inherit;
+  border-bottom: 1px solid;
+  border-bottom-color: red;
+  border-radius: 0;
+}
+
+.card {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 300px;
+  min-height: 400px;
+  background: #fff;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.1);
+  border-radius: 10px;
+  transition: 0.5s;
+  &:hover {
+    box-shadow: 0 30px 70px rgba(0, 0, 0, 0.2);
+  }
+  .box {
+    position: absolute;
+    top: 50%;
+    left: 0;
+    transform: translateY(-50%);
+    text-align: center;
+    padding: 20px;
+    box-sizing: border-box;
+    width: 100%;
+    .img {
+      width: 120px;
+      height: 120px;
+      margin: 0 auto;
+      border-radius: 50%;
+      overflow: hidden;
+      img {
+        width: 100%;
+        height: 100%;
+      }
+    }
+    h2 {
+      font-size: 20px;
+      color: #262626;
+      margin: 20px auto;
+      span {
+        font-size: 14px;
+        background: #e91e63;
+        color: #fff;
+        display: inline-block;
+        padding: 4px 10px;
+        border-radius: 15px;
+      }
+    }
+    p {
+      color: #262626;
+    }
+    span {
+      display: inline-flex;
+    }
+    ul {
+      margin: 0;
+      padding: 0;
+      li {
+        list-style: none;
+        float: left;
+        a {
+          display: block;
+          color: #aaa;
+          margin: 0 10px;
+          font-size: 20px;
+          transition: 0.5s;
+          text-align: center;
+        }
+        &:hover a {
+          color: #e91e63;
+          transform: rotateY(360deg);
+        }
+      }
+    }
+  }
+}
+
+.modal-body {
+  .message hr {
+    margin-top: 3px;
+    margin-bottom: 3px;
+  }
+}
+
+#go-to-songs-modal {
+  .modal-body {
+    img {
+      width: 100%;
+    }
+  }
+}
+
+#help-content {
+  max-width: 800px;
+
+  img {
+    max-width: 100%;
+  }
+}
+
+#contact-us-content {
+  max-width: 500px;
+  #koe-logo {
+    height: 70px;
+    #koe-logo-left {
+      img {
+        height: 70px;
+      }
+    }
+    #koe-logo-right {
+      position: absolute;
+      text-align: right;
+      bottom: 0;
+      right: 0;
+
+      div:first-child {
+        font-size: 2em;
+      }
+    }
+  }
+}
+
+#help-content, #contact-us-content {
+  margin: auto;
+  min-width: 335px;
+
+  p {
+    text-align: justify;
+  }
+}
+
+.contain-panel {
+  .panel {
+    border-radius: 0;
+    border: 1px solid rgba(0, 0, 0, .125);
+    margin-bottom: $panel-margin-bottom;
+
+    .slick-header-columns {
+      border-top: none;
+    }
+  }
+
+  button {
+    border-radius: 0;
+    border-width: 0;
+    height: $grid-button-height;
+  }
+}
+
+.slider-label {
+  text-align: right;
+}
+
+.checkboxsel, .slick-column-name {
+  label {
+    margin: 0;
+    height: 20px;
+  }
+  input[type=checkbox], input[type=radio] {
+    display: none;
+  }
+
+  input[type=checkbox] + label:before {
+    content: "\f096";
+  }
+
+  input[type=radio] + label:before {
+    content: "\f1db";
+  }
+
+  input[type=checkbox] + label:before,
+  input[type=radio] + label:before {
+    font-family: FontAwesome;
+    display: inline-block;
+    font-size: 20px;
+  }
+
+  input[type=checkbox]:checked + label:before {
+    content: "\f14a";
+  }
+
+  input[type=radio]:checked + label:before {
+    content: "\f05d";
+  }
+
+}
+
+#upload-csv-modal {
+  .modal-dialog {
+    margin-top: 5% !important;
+    margin-bottom: 0;
+    width: 75%;
+
+    .alert {
+      display: none;
+      margin-bottom: 0;
+    }
+
+    .table-wrapper {
+      overflow: auto;
+      height: 400px;
+      table th, table td {
+        white-space: nowrap;
+      }
+
+    }
+  }
+}

@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+{% load static %}
+{% load widget_tweaks %}
+
+
+{% block main-content %}
+    <div class="main-content {% block main-content-classes %}{% endblock %}">
+        <div class="content-center">
+            <div id="contact-us-content">
+                <div class="row no-margin">
+                    <div id="koe-logo" class="col-xs-12 no-padding pull-right">
+                        <div id="koe-logo-left" class="col-xs-4 no-padding-left">
+                            <img src="{% static 'images/help/koe-logo-no-text.jpg' %}">
+                        </div>
+                        <div id="koe-logo-right" class="col-xs-8 no-padding">
+                            <div>声 [ja] /ko eꜜ/ <i class="fa fa-play playable"
+                                                   audio-src="{% static 'audio/koe-pronunciation.mp3' %}"></i></div>
+                            <div>alarm, cry, voice, (bird) song, chirp</div>
+                        </div>
+                    </div>
+                </div>
+
+                <h3>Questions? Comments? Suggestions?</h3>
+                <p>We would love to hear from you. Contact us using the form below.</p>
+                <p>We hope you find Koe useful.</p>
+
+                <br>
+
+                <form id="contact-us-form" url="{% url "contact-us" %}" method="post">
+                    {% csrf_token %}
+
+                    <div class="replaceable">
+                        {% include 'partials/contact-us-form.html' %}
+                    </div>
+
+                    <div class="btn-group btn-group-justified" role="group" aria-label="...">
+                        <div class="btn-group" role="group">
+                            <button type="submit" id="submit-inquiry" class="btn btn-primary">Submit</button>
+                        </div>
+                        <div class="btn-group" role="group">
+                            <button type="submit" class="btn btn-primary" href="{{ referrer_pathname }}">Go back</button>
+                        </div>
+                    </div>
+                </form>
+
+                <h3>Legal information</h3>
+                <p>Koe is being developed at the School of Natural and Computational Sciences, Massey University,
+                    New Zealand, by computer scientist Yukio Fukuzawa, behavioural ecologist Wesley Webb and
+                    with significant contribution from Jun Ren</p>
+                <p>Koe is licensed under GPL version 3.0, Ⓒ2017-2019 Yukio Fukuzawa and Wesley Webb. All rights reserved.</p>
+                <p>Koe is free, open-source, and comes with absolutely no warrantee.
+                    User data is password protected and stored securely on a Massey University server;
+                    your data is accessible only by you and users you grant access to.
+                    By using Koe you agree to responsible, reasonable and legal usage,
+                    including the volume and type of content you upload and number of databases you create.
+                    You are responsible for reading the user manual carefully, practicing good data hygiene,
+                    and backing up your data; we accept no liability.</p>
+
+            </div>
+        </div>
+    </div>
+{% endblock %}

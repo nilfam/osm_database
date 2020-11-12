@@ -1,0 +1,45 @@
+{% extends 'base-with-sidebar-and-grid.html' %}
+{% load staticfiles %}
+{% load custom_tags %}
+
+{% block title %}View exemplars{% endblock %}
+
+{% block content-grid %}
+
+    <div class="controller-wrapper">
+
+        <div id="menu-opener">
+            <div class="input-group">
+                <i class="fa fa-bars input-group-addon left siderbar-toggler" aria-hidden="true"></i>
+            </div>
+        </div>
+
+        <div id="grid-status">
+            <div class="input-group">
+                <span class="input-group-addon left"><span id="ntotal">0</span></span>
+            </div>
+        </div>
+
+        <div class="grid-controller">
+            <div class="input-group">
+                <span class="input-group-addon left">Filter</span>
+                <input id="exemplars-grid-filter" type="text" class="form-control middle">
+            </div>
+        </div>
+    </div>
+
+    <div class="has-grid" id="exemplars-grid" granularity="{{ granularity }}" viewas="{{ viewas.username }}"
+        {% if current_database is not None %}
+            {% if current_database.is_real %}database{% else %}tmpdb{% endif %}="{{ current_database.id }}"
+         {% endif %}>
+    </div>
+
+    <div id="spectrogram-details-tooltip" class="hidden">
+        <img src=""/>
+    </div>
+
+{% endblock %}
+
+{% block modal-dialog %}
+    {% include 'partials/modal.html' with order='yes-no' yes='Set' no='Cancel' %}
+{% endblock %}

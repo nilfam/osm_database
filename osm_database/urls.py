@@ -1,21 +1,35 @@
-"""osm_database URL Configuration
-
-The `urlpatterns` list routes URLs to views. For more information please see:
-    https://docs.djangoproject.com/en/3.1/topics/http/urls/
-Examples:
-Function views
-    1. Add an import:  from my_app import views
-    2. Add a URL to urlpatterns:  path('', views.home, name='home')
-Class-based views
-    1. Add an import:  from other_app.views import Home
-    2. Add a URL to urlpatterns:  path('', Home.as_view(), name='home')
-Including another URLconf
-    1. Import the include() function: from django.urls import include, path
-    2. Add a URL to urlpatterns:  path('blog/', include('blog.urls'))
-"""
+from django.conf import settings
+from django.conf.urls import url
+from django.conf.urls.static import static
 from django.contrib import admin
+from django.contrib.auth.decorators import login_required
+from django.http import HttpResponseServerError
+from django.shortcuts import render
 from django.urls import path
 
-urlpatterns = [
-    path('admin/', admin.site.urls),
-]
+from osm_database import views
+from root import urls as root_urls
+
+urlpatterns = [] + root_urls.urlpatterns
+
+
+def handler500(request):
+    """
+    500 error handler which shows a dialog for user's feedback
+    Ref: https://docs.sentry.io/clients/python/integrations/django/#message-references
+    """
+    return HttpResponseServerError(render(request, '500.html'))
+
+
+page_names = ['entity']
+
+for page_name in page_names:
+    urlpatterns.append(
+        path('{}/'.format(page_name), login_required(views.get_view(page_name)), name=page_name),
+    )
+
+urlpatterns += \
+    [
+        url(r'^admin/', admin.site.urls),
+        url(r'^$', views.get_home_page, name='home_page')
+    ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

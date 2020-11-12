@@ -1,0 +1,125 @@
+.slick-cell {
+  font-weight: 500;
+
+  input.editor-text {
+    width: 100%;
+    height: 100%;
+    border: 0;
+    margin: 0;
+    background: transparent;
+    outline: 0;
+    padding: 0;
+  }
+
+  input.editor-checkbox {
+    margin: 0;
+    height: 100%;
+    padding: 0;
+    border: 0;
+  }
+}
+
+.slick-cell.overflow.active {
+  overflow: visible !important;
+  z-index: 999;
+}
+
+.slick-row.highlight {
+  background-color: #ffff00;
+}
+
+.slick-row.totals .slick-cell {
+  font-weight: bold;
+  background-color: black;
+  color: white;
+}
+
+.slick-row.active {
+  border: 1px solid #9954BB;
+}
+
+.slick-cell.has-image {
+  padding: 0;
+  border-top: 0;
+  border-left: 0;
+
+  .highlight {
+    border: 1px solid red;
+  }
+}
+
+.slick-cell.has-images {
+  img {
+    margin-right: 10px;
+    &.highlight {
+      border: 1px solid red;
+    }
+  }
+  img:last-child {
+    margin-right: 0;
+  }
+
+  overflow-x: hidden;
+
+  &:hover {
+    overflow-x: overlay;
+  }
+}
+
+.slick-cell {
+  padding-top: 0;
+  padding-bottom: 0;
+  .btn {
+    line-height: 1;
+  }
+}
+
+.popover-title {
+  font-weight: bolder;
+  padding: 5px;
+}
+
+.popover-content {
+  line-height: 15px;
+  padding: 5px;
+  text-align: center;
+}
+
+.popover {
+  width: 150px;
+}
+
+.slick-header-menu {
+  z-index: 1000;
+  padding: 5px 0;
+  font-size: 13px;
+  background-color: #fff;
+  border-radius: 0;
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  box-shadow: 0 6px 12px rgba(0, 0, 0, 0.175);
+  -moz-box-shadow: 2px 2px 2px silver;
+  -webkit-box-shadow: 0 6px 12px rgba(0, 0, 0, 0.175);
+  background-clip: padding-box;
+}
+
+.slick-header-menuitem {
+  padding: 2px 4px;
+  border: 1px solid transparent;
+  border-radius: 0;
+
+  &:hover {
+    color: #fff;
+    background-color: #D9230F;
+  }
+}
+
+
+.slick-header-menuitem-disabled {
+  border-color: transparent !important;
+  background: inherit !important;
+
+  &:hover {
+    color: silver;
+    background-color: white;
+  }
+}

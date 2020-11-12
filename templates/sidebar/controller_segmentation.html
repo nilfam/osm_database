@@ -1,0 +1,25 @@
+{% load custom_tags %}
+
+{% if current_database is not None and not current_database.is_real %}
+    <div class="sidebar-controllers">
+    {%  if current_database.user == user %}
+        <div>You are viewing a Collection you created. You cannot change song segmentation. If you so wish, please switch to database <strong>{{ database }}</strong></div>
+    {% else %}
+        <div>You are viewing a Collection created by <strong>{{ current_database.user.username }}</strong>. You cannot make any changes.</div>
+    {% endif %}
+    </div>
+{% endif %}
+
+
+<div class="sidebar-controllers">
+    {% if db_assignment.can_modify_segments %}
+        <button type="button" disabled id="delete-segments-btn" class="btn btn-xs btn-default btn-block">Delete selected</button>
+        <button type="button" disabled id="save-segmentations-btn" class="btn btn-xs btn-default btn-block">Save segmentation</button>
+    {% endif %}
+</div>
+
+<div class="sidebar-controllers" id="spectrogram-control-button-wrapper"></div>
+
+<div class="sidebar-controllers last">
+    {% include "sidebar/download-csv-btns.html"%}
+</div>

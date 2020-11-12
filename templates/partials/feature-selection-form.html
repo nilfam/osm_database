@@ -1,0 +1,52 @@
+{% load staticfiles %}
+{% load widget_tweaks %}
+
+<div class="form-group selectize">
+    <label for="{{ form.data_matrix.id_for_label }}" class="control-label">Existing data matrices</label>
+    <select name="data_matrix" class="form-control {% if form.data_matrix.errors %}has-error{% endif %}"
+            id="id_data_matrix" tabindex="-1">
+        <option value="">---------</option>
+        {% for dm in completed_dms %}
+            <option value="{{ dm.id }}">
+                {{ dm }} | Completed
+            </option>
+        {% endfor %}
+        {% for dm in incomplete_dms %}
+            <option value="{{ dm.id }}">
+                {{ dm }} | Not completed yet
+            </option>
+        {% endfor %}
+    </select>
+    {{ form.data_matrix.errors }}
+</div>
+
+
+<div class="form-group">
+    <label for="{{ form.features.id_for_label }}" class="control-label">Features</label>
+    <div class="row no-margin" id="{{ form.features.auto_id }}">
+        {% for choice in form.features %}
+            <label class=" col-xs-6 col-sm-4 col-md-3 col-lg-2">
+                {{ choice }}
+            </label>
+        {% endfor %}
+    </div>
+    {{ form.features.errors }}
+</div>
+
+<div class="form-group">
+    <label for="{{ form.aggregations.id_for_label }}" class="control-label">Aggregation methods</label>
+    <div class="row no-margin" id="{{ form.aggregations.auto_id }}">
+        {% for choice in form.aggregations %}
+            <label class=" col-xs-6 col-sm-4 col-md-3 col-lg-2">
+                {{ choice }}
+            </label>
+        {% endfor %}
+    </div>
+    {{ form.aggregations.errors }}
+</div>
+
+<div class="form-group">
+    <label for="{{ form.name.id_for_label }}" class="control-label">Name</label>
+    {{ form.name|add_error_class:"has-error"|add_class:"form-control" }}
+    {{ form.name.errors }}
+</div>

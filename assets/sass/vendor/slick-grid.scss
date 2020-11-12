@@ -1,0 +1,319 @@
+/*
+IMPORTANT:
+In order to preserve the uniform grid appearance, all cell styles need to have padding, margin and border sizes.
+No built-in (selected, editable, highlight, flashing, invalid, loading, :focus) or user-specified CSS
+classes should alter those!
+*/
+
+.slick-header.ui-state-default, .slick-headerrow.ui-state-default, .slick-footerrow.ui-state-default {
+  width: 100%;
+  overflow: hidden;
+  border-left: 0px !important;
+}
+
+.slick-header-columns, .slick-headerrow-columns, .slick-footerrow-columns {
+  position: relative;
+  white-space: nowrap;
+  cursor: default;
+  overflow: hidden;
+}
+
+.slick-header-column.ui-state-default {
+  position: relative;
+  display: inline-block;
+  box-sizing: content-box !important;
+  overflow: hidden;
+  -o-text-overflow: ellipsis;
+  text-overflow: ellipsis;
+  height: 18px;
+  line-height: 15px;
+  margin: 0;
+  padding: 4px;
+  float: left;
+}
+
+.slick-headerrow-column.ui-state-default, .slick-footerrow-column.ui-state-default {
+  padding: 4px;
+}
+
+.slick-header-column-sorted {
+  font-style: italic;
+}
+
+.slick-sort-indicator {
+  display: inline-block;
+  width: 8px;
+  height: 5px;
+  margin-left: 4px;
+  margin-top: 6px;
+  float: left;
+}
+
+.slick-sort-indicator-desc {
+  //background: url(../../../node_modules/slickgrid/images/sort-desc.gif);
+}
+
+.slick-sort-indicator-asc {
+  //background: url(../../../node_modules/slickgrid/images/sort-asc.gif);
+}
+
+.slick-resizable-handle {
+  position: absolute;
+  font-size: 0.1px;
+  display: block;
+  cursor: col-resize;
+  width: 4px;
+  right: 0px;
+  top: 0;
+  height: 100%;
+}
+
+.slick-sortable-placeholder {
+  background: silver;
+}
+
+.grid-canvas {
+  position: relative;
+  outline: 0;
+}
+
+.slick-row.ui-widget-content, .slick-row.ui-state-active {
+  position: absolute;
+  border: 0px;
+  width: 100%;
+}
+
+.slick-cell, .slick-headerrow-column, .slick-footerrow-column {
+  position: absolute;
+  border: 1px solid transparent;
+  border-right: 1px dotted silver;
+  border-bottom-color: silver;
+  overflow: hidden;
+  -o-text-overflow: ellipsis;
+  text-overflow: ellipsis;
+  vertical-align: middle;
+  z-index: 1;
+  padding: 1px 2px 2px 1px;
+  margin: 0;
+  white-space: nowrap;
+  cursor: default;
+}
+
+.slick-cell, .slick-headerrow-column {
+  border-bottom-color: silver;
+  line-height: 20px;
+}
+
+.slick-footerrow-column {
+  border-top-color: silver;
+}
+
+.slick-group {
+}
+
+.slick-group-toggle {
+  display: inline-block;
+}
+
+.slick-cell.highlighted {
+  background: lightskyblue;
+  background: rgba(0, 0, 255, 0.2);
+  -webkit-transition: all 0.5s;
+  -moz-transition: all 0.5s;
+  -o-transition: all 0.5s;
+  transition: all 0.5s;
+}
+
+.slick-cell.flashing {
+  border: 1px solid red !important;
+}
+
+.slick-row:not(.non-editable),
+.slick-row.edited {
+  .slick-cell > .slick-inner-cell.editable {
+
+    z-index: 2;
+    overflow: visible;
+
+    &::before {
+      content: '\f040';
+      line-height: 20px;
+      font-family: FontAwesome;
+      padding-right: 5px;
+    }
+  }
+}
+
+
+.slick-cell.dnd {
+  justify-content: center;
+}
+
+.slick-cell {
+  display: flex;
+  align-items: center;
+
+  &.has-sequence {
+    padding-top: 0;
+    padding-bottom: 0;
+    overflow-x: hidden;
+
+    &:hover {
+      overflow-x:auto;
+    }
+
+    .btn {
+      line-height: 1;
+    }
+
+    .syllable {
+      padding-left: 5px;
+      padding-right: 5px;
+      float: left;
+      //background-color: #D9230F;
+      text-align: center;
+      border-radius: 11px;
+      height: 22px;
+      border: solid 2px #666666;
+      &.end, &.start, &.sub {
+        background-color: transparent;
+        border: none;
+        padding: 2px;
+        width: 14px;
+        color: black;
+      }
+      &.active {
+        background-color: #cb210e;
+      }
+    }
+
+    .syllable:last-child {
+      margin-right: 0;
+    }
+
+    .syllable-gap {
+      float: left;
+      text-align: center;
+      color: black;
+      height: 22px;
+      font-size: 0.7em;
+
+      &::before, &::after {
+        content: '';
+        flex-grow: 1;
+        height: 2px;
+        background: #570F5C;
+        min-width: 5px;
+        display: inline-block;
+        vertical-align: middle;
+      }
+      &.active {
+        color: #cb210e;
+      }
+    }
+  }
+
+}
+
+.slick-row.even.edited {
+  //background-color: #e2fde2;
+  color: green;
+}
+
+.slick-row.odd.edited {
+  //background-color: #c3ffc3;
+  color: green;
+}
+
+.slick-cell:focus {
+  outline: none;
+}
+
+.slick-reorder-proxy {
+  display: inline-block;
+  background: blue;
+  opacity: 0.15;
+  filter: alpha(opacity=15);
+  cursor: move;
+}
+
+.slick-reorder-guide {
+  display: inline-block;
+  height: 2px;
+  background: blue;
+  opacity: 0.7;
+  filter: alpha(opacity=70);
+}
+
+.slick-selection {
+  z-index: 2;
+  position: absolute;
+  border: 2px dashed black;
+}
+
+
+/* Menu button */
+.slick-header-menubutton {
+  position: absolute;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  width: 14px;
+  background: no-repeat left center;
+  cursor: pointer;
+  display: none;
+  border-left: thin ridge silver;
+
+  &:after {
+    content: "\F103";
+    font-family: FontAwesome;
+    font-size: 13px;
+    font-weight: bold;
+    padding-left: 2px;
+    top: 5px;
+    position: absolute;
+  }
+}
+
+.slick-header-column:hover > .slick-header-menubutton,
+.slick-header-column-active .slick-header-menubutton {
+  display: inline-block;
+  background-color: white;
+}
+
+/* Menu */
+.slick-header-menu {
+  position: absolute;
+  display: inline-block;
+  margin: 0;
+  padding: 2px;
+  cursor: default;
+}
+
+
+/* Menu items */
+.slick-header-menuitem {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  cursor: pointer;
+}
+
+.slick-header-menuicon {
+  display: inline-block;
+  vertical-align: middle;
+  margin-right: 4px;
+  background-repeat: no-repeat;
+  background-position: center center;
+}
+
+.slick-header-menucontent {
+  display: inline-block;
+  vertical-align: middle;
+}
+
+
+/* Disabled */
+.slick-header-menuitem-disabled {
+  color: silver;
+}

@@ -1,0 +1,52 @@
+{% extends 'base-with-sidebar-and-grid.html' %}
+{% load staticfiles %}
+{% load custom_tags %}
+
+
+{% block title %}Process raw recording{% endblock %}
+
+{% block content-grid %}
+    <div class="row no-margin">
+        <div id="track-visualisation">
+            <div class="row no-margin">
+                <svg id="oscillogram"></svg>
+            </div>
+            <div class="row no-margin">
+                <svg id="spectrogram"></svg>
+            </div>
+        </div>
+        {% include 'partials/spectrogram-controller.html' %}
+    </div>
+
+    <div class="row no-margin" id="song-name-pattern">
+        <div class="input-group">
+            <input type="text" class="form-control"
+                   placeholder="Naming pattern. If empty, random string will be given.">
+            <span class="input-group-btn">
+                <button id="rename-all-btn" class="btn btn-primary" type="button">Rename all</button>
+            </span>
+        </div>
+    </div>
+
+    <div class="row no-margin">
+        <div class="has-grid" id="song-partition-grid"
+                {% if current_database is not None %}
+             {% if current_database.is_real %}database{% else %}tmpdb{% endif %}="{{ current_database.id }}"
+                {% endif %}>
+        </div>
+    </div>
+{% endblock %}
+
+{% block modal-dialog %}
+    {% include 'partials/modal.html' with order='yes-no' yes='Set' no='Cancel' %}
+    {% include 'partials/upload-modal.html' %}
+{% endblock %}
+
+{% block scripts %}
+    {% debug_mode as is_in_debug_mode %}
+    {% if is_in_debug_mode %}
+        <script src="{% static "d3.js" %}"></script>
+    {% else %}
+        <script src="//d3js.org/d3.v5.min.js"></script>
+    {% endif %}
+{% endblock %}
