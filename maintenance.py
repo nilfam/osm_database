@@ -83,7 +83,7 @@ def create_tmp_mysql_conf():
     Make a temporary file to store password for secure MySQL login
     :return:
     """
-    with NamedTemporaryFile(mode='w+', delete=True) as f:
+    with NamedTemporaryFile(mode='w') as f:
         f.write('[client]')
         f.write('\n')
         f.write('password=')
@@ -112,7 +112,7 @@ def reset_mysql():
     """
     with create_tmp_mysql_conf() as temp_conf:
         # generic command to log in mysql
-        cmd = ['mysql', '--defaults-extra-file={}'.format(temp_conf.name), '--database', db_name]
+        cmd = ['C:\\Program Files\\MySQL\MySQL Server 8.0\\bin\\mysql.exe', '--defaults-extra-file={}'.format(temp_conf.name), '--database', db_name]
 
         # Run query 'show tables;' and get the result
         result, err = run_command(cmd + ['-e', 'show tables;'], suppress_output=True)
@@ -139,7 +139,7 @@ def backup_mysql():
     :return: None
     """
     with create_tmp_mysql_conf() as temp_conf:
-        cmd = ['mysqldump', '--defaults-extra-file={}'.format(temp_conf.name), db_name, '--result-file', backup_file]
+        cmd = ['C:\\Program Files\\MySQL\MySQL Server 8.0\\bin\\mysqldump.exe', '--defaults-extra-file={}'.format(temp_conf.name), db_name, '--result-file', backup_file]
         out, err = run_command(cmd, suppress_output=True)
 
         return err == b'', err.decode('utf-8')
@@ -154,7 +154,7 @@ def restore_mysql():
     with create_tmp_mysql_conf() as temp_conf:
         # generic command to log in mysql
         cmd = [
-            'mysql',
+            'C:\\Program Files\\MySQL\MySQL Server 8.0\\bin\\mysql.exe',
             '--defaults-extra-file={}'.format(temp_conf.name),
             '--init-command', 'SET FOREIGN_KEY_CHECKS=0;',
             '--database', db_name
@@ -416,7 +416,7 @@ def probe_mysql():
     with create_tmp_mysql_conf() as temp_conf:
         # generic command to log in mysql
         cmd = [
-            'mysql', '--defaults-extra-file={}'.format(temp_conf.name),
+            'C:\\Program Files\\MySQL\MySQL Server 8.0\\bin\\mysql.exe', '--defaults-extra-file={}'.format(temp_conf.name),
             '--database', db_name, '--execute', 'show tables;'
         ]
         out, err = run_command(cmd, suppress_output=True, suppress_error=True)
