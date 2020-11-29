@@ -123,6 +123,9 @@ class OsmEntity(models.Model):
     top = models.FloatField(null=False, blank=False)
     geojson = models.ForeignKey(GeoJSON, null=False, blank=False, on_delete=models.CASCADE)
 
+    def __str__(self):
+        return "ID: {} Type: {} Category: {} name={}"\
+            .format(self.osm_id, self.type, self.category, self.display_name)
 
 # class Coordinate(models.Model):
 #     type = models.CharField(max_length=255)
