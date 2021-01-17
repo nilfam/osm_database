@@ -2,6 +2,7 @@ import json
 import os
 import pickle
 import traceback
+from decimal import Decimal
 from logging import warning
 
 from django.core.management import BaseCommand
@@ -21,8 +22,8 @@ class Command(BaseCommand):
             self.last_position_id += 1
             position = Position()
             position.id = self.last_position_id
-            position.lat = lat
-            position.lon = lon
+            position.lat = Decimal(str(lat))
+            position.lon = Decimal(str(lon))
             positions.append(position)
 
         Position.objects.bulk_create(positions)
@@ -35,7 +36,7 @@ class Command(BaseCommand):
 
     def process_file(self, filename, existing_osm_ids):
         with open(filename, 'r') as f:
-            content = json.load(f)
+            content = json.load(f, parse_float=Decimal)
 
         for ind, entity in enumerate(content):
             entity_obj = OsmEntity()
@@ -55,8 +56,8 @@ class Command(BaseCommand):
             entity_obj.place_rank = entity.get('place_rank', None)
             entity_obj.importance = entity.get('importance', None)
 
-            entity_obj.lat = entity['lat']
-            entity_obj.lon = entity['lon']
+            entity_obj.lat = Decimal(str(entity['lat']))
+            entity_obj.lon = Decimal(str(entity['lon']))
 
             bbox = entity['boundingbox']
 
@@ -126,7 +127,7 @@ class Command(BaseCommand):
                 multilinestring.save()
 
             elif geojson.type == 'MultiPolygon':
-                multipolygon = MultiPoligon()
+                multipolygon = MultiPolygon()
                 multipolygon.geojson = geojson
                 multipolygon.save()
 

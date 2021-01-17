@@ -11,8 +11,8 @@ class GeoJSON(models.Model):
 
 class Position(models.Model):
     id = models.BigIntegerField(primary_key=True, auto_created=False)
-    lat = models.FloatField(null=False, blank=False)
-    lon = models.FloatField(null=False, blank=False)
+    lat = models.DecimalField(max_digits=22, decimal_places=18, null=False, blank=False)
+    lon = models.DecimalField(max_digits=22, decimal_places=18, null=False, blank=False)
 
 
 class Point(models.Model):
@@ -81,7 +81,7 @@ class Polygon(models.Model):
     interior_rings = models.ManyToManyField(LinearRing, related_name="interiors")
 
 
-class MultiPoligon(models.Model):
+class MultiPolygon(models.Model):
     geojson = models.ForeignKey(GeoJSON, null=False, blank=False, on_delete=models.CASCADE)
     polygons = models.ManyToManyField(Polygon)
 
@@ -115,8 +115,8 @@ class OsmEntity(models.Model):
     place_id = models.IntegerField(null=False, blank=False)
     place_rank = models.IntegerField()
     importance = models.FloatField()
-    lat = models.FloatField()
-    lon = models.FloatField()
+    lat = models.DecimalField(max_digits=22, decimal_places=18)
+    lon = models.DecimalField(max_digits=22, decimal_places=18)
     left = models.FloatField(null=False, blank=False)
     bottom = models.FloatField(null=False, blank=False)
     right = models.FloatField(null=False, blank=False)

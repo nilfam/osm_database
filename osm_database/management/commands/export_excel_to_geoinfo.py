@@ -3,6 +3,7 @@ import os
 import pickle
 import warnings
 from collections import OrderedDict
+from decimal import Decimal
 
 from django.core.management import BaseCommand
 from progress.bar import Bar
@@ -46,7 +47,7 @@ def extract_points_for_polygons(polygons):
             ext_ring_ids_to_list_of_points[ring_id] = points
         else:
             points = ext_ring_ids_to_list_of_points[ring_id]
-        points.append((lat, lon))
+        points.append((lat.normalize(), lon.normalize()))
         bar.next()
     bar.finish()
     geojson_to_exterior_id = {x: y for x, y in polygons.values_list('geojson_id', 'exterior_ring_id')}
@@ -56,8 +57,8 @@ def extract_points_for_polygons(polygons):
 def extract_points_for_multipolygons(osm_entities):
     osm_entities_multipolys = osm_entities.filter(geojson__type='MultiPolygon')
     geojson_ids = osm_entities_multipolys.values_list('geojson_id', flat=True)
-    multipolys = MultiPoligon.objects.filter(geojson_id__in=geojson_ids)
-    associated_polygons = Polygon.objects.filter(multipoligon__geojson__in=geojson_ids)
+    multipolys = MultiPolygon.objects.filter(geojson_id__in=geojson_ids)
+    associated_polygons = Polygon.objects.filter(multipolygon__geojson__in=geojson_ids)
 
     polygon_geojson_to_exterior_id, ext_ring_ids_to_list_of_points = extract_points_for_polygons(associated_polygons)
 
@@ -103,7 +104,7 @@ def extract_points_for_linestrings(osm_entities):
             lines_ids_to_list_of_points[line_id] = points
         else:
             points = lines_ids_to_list_of_points[line_id]
-        points.append((lat, lon))
+        points.append((lat.normalize(), lon.normalize()))
         bar.next()
     bar.finish()
     geojson_to_line_id = {x: y for x, y in lines.values_list('geojson_id', 'id')}
@@ -127,7 +128,7 @@ def extract_points_for_multilinestrings(osm_entities):
             lines_ids_to_list_of_points[linestring_id] = points
         else:
             points = lines_ids_to_list_of_points[linestring_id]
-        points.append((lat, lon))
+        points.append((lat.normalize(), lon.normalize()))
 
         if id not in multilines_ids_to_list_of_line_ids:
             linestring_ids = []
@@ -160,7 +161,7 @@ def extract_points_for_point(osm_entities):
 
     bar = Bar("Extracting points_positions_info", max=len(points_positions_info))
     for point_id, lat, lon in points_positions_info:
-        point_ids_to_geopoints[point_id] = (lat, lon)
+        point_ids_to_geopoints[point_id] = (lat.normalize(), lon.normalize())
         bar.next()
     bar.finish()
     geojson_to_point_id = {x: y for x, y in points.values_list('geojson_id', 'id')}
@@ -215,8 +216,8 @@ class Command(BaseCommand):
             bar = Bar("Reading Excel file", max=df.shape[0])
 
             for row_num, row in df.iterrows():
-                relatum_centroid = [x.strip() for x in row.rcoords[1:-1].split(',')]
-                locatum_centroid = [x.strip() for x in row.lcoords[1:-1].split(',')]
+                relatum_centroid = list(map(Decimal, [x.strip() for x in row.rcoords[1:-1].split(',')]))
+                locatum_centroid = list(map(Decimal, [x.strip() for x in row.lcoords[1:-1].split(',')]))
 
                 rlat, rlon = relatum_centroid
                 excel_row = ExcelRowInfo(relatum_centroid, locatum_centroid)
@@ -235,8 +236,6 @@ class Command(BaseCommand):
 
         osm_entities = OsmEntity.objects.filter(lat__in=rc_lats, lon__in=rc_lons)
         entities_vl = osm_entities.values_list('osm_id', 'lat', 'lon', 'geojson_id', 'type', 'category', 'geojson__type')
-
-        # <QuerySet [('LineString',), ('Polygon',), ('MultiLineString',), ('MultiPolygon',), ('Point',)]>
 
         if ext_ring_ids_to_list_of_points is None:
             osm_entities_polygons = osm_entities.filter(geojson__type='Polygon')
@@ -282,7 +281,7 @@ class Command(BaseCommand):
 
         bar = Bar("Extracting osm_entities info", max=entities_vl.count())
         for osm_id, rlat, rlon, geojson_id, type, category, geojson_type in entities_vl:
-            key = (str(rlat), str(rlon))
+            key = (rlat, rlon)
             excel_row = excel_row_infos.get(key, None)
             if excel_row is None:
                 bar.next()
@@ -324,7 +323,7 @@ class Command(BaseCommand):
 
         bar = Bar("Writing to file", max=df.shape[0])
         for row_num, row in df.iterrows():
-            relatum_centroid = [x.strip() for x in row.rcoords[1:-1].split(',')]
+            relatum_centroid = list(map(Decimal, [x.strip() for x in row.rcoords[1:-1].split(',')]))
             rlat, rlon = relatum_centroid
             key = (rlat, rlon)
             excel_row = excel_row_infos[key]
@@ -369,8 +368,8 @@ class Command(BaseCommand):
                 excel_col = '[' + ', '.join(['{}'.format(point) for point in excel_row.wkt_points[0]]) + ']'
 
             else:
-                excel_string = 'NOT SUPPORTED'
-                excel_col = 'NOT SUPPORTED'
+                excel_string = 'NOT FOUND'
+                excel_col = 'NOT FOUND'
 
             output_df.loc[index] = [row_num + 1, excel_row.osm_id, locatum_col, relatum_col, excel_row.type, excel_row.category, excel_row.geojson_type, excel_col]
             output_df_polygons.loc[index] = [row_num + 1, excel_row.osm_id, locatum_col, relatum_col, excel_row.type, excel_row.category, excel_row.geojson_type, excel_string]

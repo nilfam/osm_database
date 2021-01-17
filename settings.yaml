@@ -1,5 +1,5 @@
 # Database url:
-database_url: 'mysql://osm:osm@localhost:3306/osm'
+database_url: mysql://osm:osm@localhost:3306/osm?init_command=SET sql_mode='STRICT_TRANS_TABLES'
 
 language_code: 'en-nz'
 timezone: 'UTC'
@@ -44,3 +44,9 @@ jupyter:
     port: 8002
 
 secret_key: r'ur3@h0h04@4e2_ll-_^($ksqja0q!38iwdjfd73$n+$k(f_i8k'
+
+#path_to_mysql: r'C:\Program Files\MySQL\MySQL Server 8.0\bin\mysql.exe'
+#path_to_mysqldump: r'C:\Program Files\MySQL\MySQL Server 8.0\bin\mysqldump.exe'
+
+path_to_mysql: mysql
+path_to_mysqldump: mysqldump

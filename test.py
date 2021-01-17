@@ -49,7 +49,7 @@ else:
         pickle.dump(df, f, pickle.HIGHEST_PROTOCOL)
 
 
-original_columns = ['exp', 'prep', 'locatum', 'relatum', 'lcoords', 'rcoords', 'type', 'bearing', 'Distance',	'LocatumType', 'RelatumType']
+original_columns = ['exp', 'prep', 'locatum', 'relatum', 'lcoords', 'rcoords', 'type', 'bearing', 'Distance', 'LocatumType', 'RelatumType']
 
 bar = Bar("Processing each row in file {}".format(file_location), max=df.shape[0])
 

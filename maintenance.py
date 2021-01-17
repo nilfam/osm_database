@@ -112,7 +112,7 @@ def reset_mysql():
     """
     with create_tmp_mysql_conf() as temp_conf:
         # generic command to log in mysql
-        cmd = ['C:\\Program Files\\MySQL\MySQL Server 8.0\\bin\\mysql.exe', '--defaults-extra-file={}'.format(temp_conf.name), '--database', db_name]
+        cmd = [path_to_mysql, '--defaults-extra-file={}'.format(temp_conf.name), '--database', db_name]
 
         # Run query 'show tables;' and get the result
         result, err = run_command(cmd + ['-e', 'show tables;'], suppress_output=True)
@@ -139,7 +139,7 @@ def backup_mysql():
     :return: None
     """
     with create_tmp_mysql_conf() as temp_conf:
-        cmd = ['C:\\Program Files\\MySQL\MySQL Server 8.0\\bin\\mysqldump.exe', '--defaults-extra-file={}'.format(temp_conf.name), db_name, '--result-file', backup_file]
+        cmd = [path_to_mysqldump, '--defaults-extra-file={}'.format(temp_conf.name), db_name, '--result-file', backup_file]
         out, err = run_command(cmd, suppress_output=True)
 
         return err == b'', err.decode('utf-8')
@@ -154,7 +154,7 @@ def restore_mysql():
     with create_tmp_mysql_conf() as temp_conf:
         # generic command to log in mysql
         cmd = [
-            'C:\\Program Files\\MySQL\MySQL Server 8.0\\bin\\mysql.exe',
+            path_to_mysql,
             '--defaults-extra-file={}'.format(temp_conf.name),
             '--init-command', 'SET FOREIGN_KEY_CHECKS=0;',
             '--database', db_name
@@ -416,7 +416,7 @@ def probe_mysql():
     with create_tmp_mysql_conf() as temp_conf:
         # generic command to log in mysql
         cmd = [
-            'C:\\Program Files\\MySQL\MySQL Server 8.0\\bin\\mysql.exe', '--defaults-extra-file={}'.format(temp_conf.name),
+            path_to_mysql, '--defaults-extra-file={}'.format(temp_conf.name),
             '--database', db_name, '--execute', 'show tables;'
         ]
         out, err = run_command(cmd, suppress_output=True, suppress_error=True)
@@ -556,6 +556,8 @@ if __name__ == '__main__':
     wait_db = args.wait_db
     generate_config = args.generate_config
     config = get_config()
+    path_to_mysql = config['path_to_mysql']
+    path_to_mysqldump = config['path_to_mysqldump']
 
     if generate_config:
         populate_environment_variables(config)
