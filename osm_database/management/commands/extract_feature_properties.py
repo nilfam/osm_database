@@ -10,6 +10,7 @@ import numpy as np
 
 from nltk.corpus import wordnet
 from openpyxl import load_workbook
+from progress.bar import Bar
 from urllib3.exceptions import InsecureRequestWarning
 
 warnings.filterwarnings("ignore", category=InsecureRequestWarning)
@@ -118,6 +119,7 @@ def recursive_add_parents(core_features, root_feature, thing, rank):
 class Command(BaseCommand):
     def add_arguments(self, parser):
         parser.add_argument('--file', action='store', dest='file', required=True, type=str)
+        parser.add_argument('--sheet-name', action='store', dest='sheet_name', default='Sheet1', type=str)
 
     def handle(self, *args, **options):
         feature_dict_file = 'feature_dict.pkl'
@@ -125,8 +127,12 @@ class Command(BaseCommand):
             raise Exception('Dictionary not found')
 
         file = options['file']
+        sheet_name = options['sheet_name']
         if not os.path.isfile(file):
             raise Exception('File {} does not exist'.format(file))
+
+        file_name = os.path.splitext(os.path.split(file)[1])[0]
+        print('File name = {}'.format(file_name))
 
         with open(feature_dict_file, 'rb') as f:
             feature_dict = pickle.load(f)
@@ -151,14 +157,14 @@ class Command(BaseCommand):
             ]
         ]
 
-        garden_feature = feature_dict['name']['Gardens']
+        # garden_feature = feature_dict['name']['Gardens']
         thing = feature_dict['name']['Thing']
-        core_features = {}
-        recursive_add_parents(core_features, garden_feature, thing, 1)
+        # core_features = {}
+        # recursive_add_parents(core_features, garden_feature, thing, 1)
 
-        prune_multualy_exclusive(core_features, multually_exclusive_feature_groups)
+        # prune_multualy_exclusive(core_features, multually_exclusive_feature_groups)
 
-        new_feature_dict = {}
+        # new_feature_dict = {}
         wordnet_feature_dict = {}
 
         for feature in feature_dict['name'].values():
@@ -167,19 +173,28 @@ class Command(BaseCommand):
             if name.endswith('Feature'):
                 name = feature.name[:-7]
 
-            new_feature_dict[name.lower()] = feature
+            # new_feature_dict[name.lower()] = feature
             name_spaced = re.sub("([a-z])([A-Z])", "\g<1> \g<2>", name)
             wordnet_feature_dict[name_spaced.lower()] = feature
 
-        df = pd.read_excel(file)
+        df = pd.read_excel(file, sheet_name=sheet_name)
 
         extracted = {}
         core_features_all = {}
         core_features_to_column = {}
 
+        extracted_cache = 'extracted.pkl'
+        if os.path.isfile(extracted_cache):
+            with open(extracted_cache, 'rb') as f:
+                extracted = pickle.load(f)
+        else:
+            extracted = {}
+
+        bar = Bar('Reading excel file...', max=df.shape[0])
         for index, row in df.iterrows():
             relatum_type = row['TYPE']
             if relatum_type in extracted:
+                bar.next()
                 continue
             # relatum_type_hash = relatum_type.lower().replace('_', '')
             # feature = new_feature_dict.get(relatum_type_hash, None)
@@ -190,7 +205,11 @@ class Command(BaseCommand):
             if features is not None:
                 for feature in features:
                     recursive_add_parents(core_features_all, feature, thing, 1)
+            bar.next()
+        bar.finish()
 
+        with open(extracted_cache, 'wb') as f:
+            pickle.dump(extracted, f)
 
         columns = ['0name', '1osm feature 1', '2match score 1', '3osm feature 2', '4match score 2', '5osm feature 3', '6match score 3']
         column_index = len(columns)
@@ -201,6 +220,7 @@ class Command(BaseCommand):
 
         feature_type_df = pd.DataFrame(columns=columns)
 
+        bar = Bar('Extracting features', max=df.shape[0])
         for index, row in df.iterrows():
             relatum_type = row['TYPE']
             features, scores = extracted[relatum_type]
@@ -232,8 +252,10 @@ class Command(BaseCommand):
                     row[index_of_core_feature] = 1
 
             feature_type_df.loc[index] = row
+            bar.next()
+        bar.finish()
 
-        filename = 'files/xlsx/LagoInputSheet1_with_all_level_parents.xlsx'
+        filename = 'files/xlsx/{}_{}_with_all_level_parents.xlsx'.format(file_name, sheet_name)
         sorted_column_df = feature_type_df.sort_index(axis=1)
 
         sorted_column_df.to_excel(filename, index=None)

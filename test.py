@@ -12,41 +12,10 @@ django.setup()
 from osm_database.models import *
 
 
-def get_coordinate(osm_entity):
-    geojson_id = osm_entity.geojson.id
-    geojson_type = osm_entity.geojson.type
-    if geojson_type == 'Point':
-        lonlat = str(list(Point.objects.filter(geojson_id=geojson_id).values_list('position__lon', 'position__lat')))
-        return lonlat
-    if geojson_type == 'LineString':
-        line_string = LineString.objects.get(geojson_id=geojson_id)
-        positions_lon_lat = str(list(line_string.positions.values_list('lon', 'lat')))
-        return positions_lon_lat
-    if geojson_type == 'Polygon':
-        polygon = Polygon.objects.get(geojson_id=geojson_id)
-        positions_lon_lat = str(list(polygon.exterior_ring.positions.values_list('lon', 'lat')))
-        return positions_lon_lat
-    if geojson_type == 'MultiPolygon':
-        raise Exception('Type multipolygon is not supported')
-
-    if geojson_type == 'MultiLineString':
-        m = MultiLineString.objects.get(geojson_id=geojson_id)
-        return str(m.linestrings.values_list('positions__lon', 'positions__lat'))
-
-    raise Exception('type {} is not supported'.format(geojson_type))
 
 
-df_cache = 'ConnerData.cache'
 file_location = 'ConnerData.xlsx'
-
-if os.path.exists(df_cache):
-    with open(df_cache, 'rb') as f:
-        df = pickle.load(f)
-else:
-    df = pd.read_excel(file_location)
-
-    with open(df_cache, 'wb') as f:
-        pickle.dump(df, f, pickle.HIGHEST_PROTOCOL)
+df = pd.read_excel(file_location)
 
 
 original_columns = ['exp', 'prep', 'locatum', 'relatum', 'lcoords', 'rcoords', 'type', 'bearing', 'Distance', 'LocatumType', 'RelatumType']
