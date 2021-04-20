@@ -89,7 +89,7 @@ def prune_multualy_exclusive(core_features, multually_exclusive_feature_groups):
         rank_to_features = {}
         lowest_rank = 9999
         for feature in group:
-            rank = core_features.get(feature, None)
+            _, rank = core_features.get(feature.name, (None, None))
             if rank is not None:
                 if rank not in rank_to_features:
                     features = []
@@ -101,7 +101,7 @@ def prune_multualy_exclusive(core_features, multually_exclusive_feature_groups):
         for rank, features in rank_to_features.items():
             if rank > lowest_rank:
                 for feature in features:
-                    del core_features[feature]
+                    del core_features[feature.name]
 
 
 def recursive_add_parents(core_features, root_feature, thing, rank):
@@ -112,7 +112,7 @@ def recursive_add_parents(core_features, root_feature, thing, rank):
         return
 
     for parent in root_feature.parent:
-        core_features[parent] = rank
+        core_features[parent.name] = (parent, rank)
         recursive_add_parents(core_features, parent, thing, rank+1)
 
 
@@ -194,14 +194,10 @@ class Command(BaseCommand):
         for index, row in df.iterrows():
             relatum_type = row['TYPE']
             if relatum_type in extracted:
-                bar.next()
-                continue
-            # relatum_type_hash = relatum_type.lower().replace('_', '')
-            # feature = new_feature_dict.get(relatum_type_hash, None)
-
-            # if feature is None:
-            features, sims = find_best_match(relatum_type, wordnet_feature_dict)
-            extracted[relatum_type] = features, sims
+                features, sims = extracted[relatum_type]
+            else:
+                features, sims = find_best_match(relatum_type, wordnet_feature_dict)
+                extracted[relatum_type] = features, sims
             if features is not None:
                 for feature in features:
                     recursive_add_parents(core_features_all, feature, thing, 1)
@@ -213,9 +209,9 @@ class Command(BaseCommand):
 
         columns = ['0name', '1osm feature 1', '2match score 1', '3osm feature 2', '4match score 2', '5osm feature 3', '6match score 3']
         column_index = len(columns)
-        for parent_feature in core_features_all:
-            columns.append(parent_feature.name)
-            core_features_to_column[parent_feature] = column_index
+        for parent_feature_name, (parent_feature, rank) in core_features_all.items():
+            columns.append(parent_feature_name)
+            core_features_to_column[parent_feature_name] = column_index
             column_index += 1
 
         feature_type_df = pd.DataFrame(columns=columns)
