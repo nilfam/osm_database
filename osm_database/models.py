@@ -86,26 +86,6 @@ class MultiPolygon(models.Model):
     polygons = models.ManyToManyField(Polygon)
 
 
-# class PointCoordinate(models.Model):
-#     point = models.ForeignKey(Point, null=False, blank=False, on_delete=models.CASCADE)
-#     position = models.ForeignKey(Position, null=False, blank=False, on_delete=models.CASCADE)
-#
-#
-# class MultiPointCoordinates(models.Model):
-#     multipoint = models.ForeignKey(MultiPoint, null=False, blank=False, on_delete=models.CASCADE)
-#     point = models.ForeignKey(Point, null=False, blank=False, on_delete=models.CASCADE)
-#
-#
-# class LineStringCoordinates(models.Model):
-#     multipoint = models.ForeignKey(MultiPoint, null=False, blank=False, on_delete=models.CASCADE)
-#     point = models.ForeignKey(Point, null=False, blank=False, on_delete=models.CASCADE)
-#
-#
-# class PointListEntry(models.Model):
-#     pointlist = models.ForeignKey(PointList, null=False, blank=False, on_delete=models.CASCADE)
-#     point = models.ForeignKey(Point, null=False, blank=False, on_delete=models.CASCADE)
-
-
 class OsmEntity(models.Model):
     osm_id = models.BigIntegerField(null=False, blank=False, unique=True, primary_key=True)
     osm_type = models.CharField(max_length=255)
@@ -113,35 +93,40 @@ class OsmEntity(models.Model):
     category = models.CharField(max_length=255)
     display_name = models.CharField(max_length=1024)
     place_id = models.IntegerField(null=False, blank=False)
-    place_rank = models.IntegerField()
-    importance = models.FloatField()
+    place_rank = models.IntegerField(null=True, blank=True)
+    importance = models.FloatField(null=True, blank=True)
     lat = models.DecimalField(max_digits=22, decimal_places=18)
     lon = models.DecimalField(max_digits=22, decimal_places=18)
-    left = models.FloatField(null=False, blank=False)
-    bottom = models.FloatField(null=False, blank=False)
-    right = models.FloatField(null=False, blank=False)
-    top = models.FloatField(null=False, blank=False)
+    left = models.FloatField(null=True, blank=True)
+    bottom = models.FloatField(null=True, blank=True)
+    right = models.FloatField(null=True, blank=True)
+    top = models.FloatField(null=True, blank=True)
     geojson = models.ForeignKey(GeoJSON, null=False, blank=False, on_delete=models.CASCADE)
 
     def __str__(self):
         return "ID: {} Type: {} Category: {} name={}"\
             .format(self.osm_id, self.type, self.category, self.display_name)
 
-# class Coordinate(models.Model):
-#     type = models.CharField(max_length=255)
-#
-#
-# class CoordinatePointList(models.Model):
-#     pointlist = models.ForeignKey(PointList, null=False, blank=False, on_delete=models.CASCADE)
-#     coordinates = models.ForeignKey(Coordinate, null=False, blank=False, on_delete=models.CASCADE)
+
+class TagName(models.Model):
+    name = models.CharField(max_length=255, blank=False, null=False, unique=True)
 
 
-# class EntityCentroid(models.Model):
-#     entity = models.ForeignKey(OsmEntity, null=False, blank=False, on_delete=models.CASCADE)
-#     point = models.ForeignKey(Point, null=False, blank=False, on_delete=models.CASCADE)
+class TagValue(models.Model):
+    value = models.CharField(max_length=1000, blank=False, null=False)
 
 
-# class EntityCoordinate(models.Model):
-#     entity = models.ForeignKey(OsmEntity, null=False, blank=False, on_delete=models.CASCADE)
-#     coordinate = models.ForeignKey(Coordinate, null=False, blank=False, on_delete=models.CASCADE)
+class Tag(models.Model):
+    k = models.ForeignKey(TagName, blank=False, null=False, on_delete=models.CASCADE)
+    v = models.ForeignKey(TagValue, blank=False, null=False, on_delete=models.CASCADE)
+
+    class Meta:
+        unique_together = ('k', 'v')
+
+
+class Node(models.Model):
+    osm_id = models.BigIntegerField(null=False, blank=False, unique=True, primary_key=True)
+    lat = models.DecimalField(max_digits=22, decimal_places=18)
+    lon = models.DecimalField(max_digits=22, decimal_places=18)
+    tags = models.ManyToManyField(Tag, related_name="interiors")
 
