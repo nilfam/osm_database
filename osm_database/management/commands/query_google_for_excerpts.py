@@ -1,21 +1,24 @@
 import os
 import pathlib
 import pickle
-import time
+import urllib
 
 import pandas as pd
-import requests
 from bs4 import BeautifulSoup
 from django.core.management import BaseCommand
 from openpyxl import load_workbook
 from selenium import webdriver
 from selenium.common.exceptions import TimeoutException, NoSuchElementException
 from selenium.webdriver.support import expected_conditions as ec
+from selenium.webdriver.support.expected_conditions import staleness_of
 from selenium.webdriver.support.wait import WebDriverWait
 from sortedcontainers import SortedSet
 from timeout_decorator import timeout_decorator
 
+from osm_database.management.commands.util import CaptchaSolver, send_notification, CaptchaUnsolvableException
 from root.utils import send_capcha_email
+
+from distutils import util as distutils_util
 
 current_dir = os.path.dirname(os.path.abspath(__file__))
 script_name = os.path.split(__file__)[1][0:-3]
@@ -91,11 +94,14 @@ class BrowserWrapper:
         self.driver = None
         self.browser = None
         self.cookies = None
+        self.google_abuse_exemption_cookie = None
+
         self.cache_dir = cache_dir
         pathlib.Path(cache_dir).mkdir(parents=True, exist_ok=True)
 
         self.cookies_cache_file = os.path.join(self.cache_dir, 'cookies.pkl')
         self.browser_initiated = False
+        self.auto_solve_captcha = False
 
     def init_browser(self):
         self.driver = webdriver.Chrome
@@ -106,20 +112,42 @@ class BrowserWrapper:
             with open(self.cookies_cache_file, 'rb') as f:
                 cookies = pickle.load(f)
                 if cookies is not None:
-                    self.browser.get('https://google.com/404error')
-                    for cookie in cookies:
-                        self.browser.add_cookie(cookie)
+                    self._add_cookies(cookies)
 
         self.browser_initiated = True
 
-    def add_cookies(self, cookies):
+    def _add_cookies(self, cookies):
+        self.cookies = cookies
         self.browser.get('https://google.com/404error')
         for cookie in cookies:
+            if cookie.get('name', None) == 'GOOGLE_ABUSE_EXEMPTION':
+                self.google_abuse_exemption_cookie = cookie
+                break
+
+        self.refresh_cookies()
+
+    def refresh_cookies(self):
+        self.browser.delete_all_cookies()
+        for cookie in self.cookies:
             self.browser.add_cookie(cookie)
 
+    def add_bypass_token(self, token):
+        _GRECAPTCHA = token['_GRECAPTCHA']
+        expiry = int(token['expiry'])
+        secure = bool(distutils_util.strtobool(token['secure']))
+        value = token['value']
+
+        self.google_abuse_exemption_cookie['_GRECAPTCHA'] = _GRECAPTCHA
+        self.google_abuse_exemption_cookie['expiry'] = expiry
+        self.google_abuse_exemption_cookie['secure'] = secure
+        self.google_abuse_exemption_cookie['value'] = value
+
+        self.refresh_cookies()
+
+    def save_cookies(self):
         print('Saving cookies')
         with open(self.cookies_cache_file, 'wb') as f:
-            pickle.dump(cookies, f)
+            pickle.dump(self.browser.get_cookies(), f)
 
 class Page:
     def __init__(self, query, url, name):
@@ -148,7 +176,26 @@ class Page:
             else:
                 next_pages = []
         else:
-            response = self.make_query(browser_wrapper)
+            query_successful = False
+            response = None
+            retrials = 0
+            bypass_token = None
+            while not query_successful:
+                try:
+                    if retrials > 0:
+                        print('    Retry URL {}. This is the {} times'.format(self.url, retrials))
+                        if retrials > 5:
+                            send_capcha_email("n.aflaki@massey.ac.nz")
+                    else:
+                        print('Querying {}'.format(self.url))
+                    response, bypass_token = self.make_query(browser_wrapper)
+                    query_successful = True
+                except CaptchaUnsolvableException as e:
+                    retrials += 1
+                    continue
+                except:
+                    raise
+
             soup = BeautifulSoup(response)
             body = soup.find('body')
             self.result_count = get_result_stats(body)
@@ -161,6 +208,13 @@ class Page:
             with open(cache_file_path, 'w', encoding='utf-8') as htmlfile:
                 htmlfile.write(response)
 
+            if bypass_token is not None:
+                browser_wrapper.add_bypass_token(bypass_token)
+                browser_wrapper.save_cookies()
+
+            # if bypass_token is not None:
+            #     browser_wrapper.add_bypass_token(bypass_token)
+
         return next_pages
 
     def make_query(self, browser_wrapper):
@@ -169,35 +223,64 @@ class Page:
 
         browser = browser_wrapper.browser
 
-        print('Querying url:' + self.url)
+        # print('Querying url:' + self.url)
         browser.get(url=self.url)
-        cookies = None
+        bypass_token = None
 
-        try:
-            captcha = browser.find_element_by_css_selector('iframe[role=presentation]')
-        except NoSuchElementException:
-            captcha = None
+        captcha_not_present_or_solved = False
+        while not captcha_not_present_or_solved:
 
-        if captcha is not None:
-            # browser.switch_to.frame(captcha)
             try:
-                send_capcha_email('n.aflaki@massey.ac.nz')
-            except:
-                print("Unable to send email")
-            print('\nPlease solve the captcha now')
-            wait = WebDriverWait(browser, 1200)
+                captcha = browser.find_element_by_css_selector('iframe[role=presentation]')
+            except NoSuchElementException:
+                captcha_not_present_or_solved = True
+                captcha = None
+
+            if captcha is not None:
+                if browser_wrapper.auto_solve_captcha:
+                    send_notification('Google querier', 'Attempting to solve captcha')
+                    print('Attempting to solve captcha')
+                    old_page = browser.find_element_by_tag_name('html')
+                    wait = WebDriverWait(browser, 1200)
+                    try:
+                        captcha_solver = CaptchaSolver(browser, self.url, browser_wrapper.google_abuse_exemption_cookie)
+                        bypass_token = captcha_solver.run()
+                        wait.until(staleness_of(old_page))
+                    except CaptchaUnsolvableException as e:
+                        send_notification('Google querier', 'Captcha is unsolvable. Page will reload with a new captcha')
+                        print('Captcha is unsolvable. Page will reload with a new captcha')
+                        raise e
+                    except TimeoutException:
+                        send_notification('Google querier', 'Failed to solve captcha in the expected time')
+                        print('Failed to solve captcha in the expected time')
+                    else:
+                        send_notification('Google querier', 'Captcha solved successfully, proceeding')
+                        print('Captcha solved successfully, proceeding')
+                else:
+                    try:
+                        send_capcha_email('n.aflaki@massey.ac.nz')
+                    except:
+                        send_notification('Google querier', 'Unable to send email')
+                        print("Unable to send email")
+
+                    send_notification('Google querier', 'Please solve the captcha now')
+                    print('\nPlease solve the captcha now')
+
+            wait = WebDriverWait(browser, 10)
             try:
                 wait.until(ec.presence_of_element_located(('css selector', '#result-stats')))
             except TimeoutException:
-                print('\nFailed to solve captcha in the expected time')
+                send_notification('Google querier', 'Failed to load the search page')
+                print('Failed to load the search page')
             else:
-                print('\nCaptcha solved successfully, proceeding')
-                cookies = browser.get_cookies()
+                send_notification('Google querier', 'Search page loaded successfully, proceeding')
+                print('Search page loaded successfully, proceeding')
+                captcha_not_present_or_solved = True
 
-        if cookies is not None:
-            raise CookiesPopulationRequiredException(cookies)
+            # At this point the bypass_token must also be not None
+            # raise CookiesPopulationRequiredException(cookies)
 
-        return browser.page_source
+        return browser.page_source, bypass_token
 
 
 class QueryResult:
@@ -217,7 +300,8 @@ class QueryResult:
             self.pages = {}
             self.not_queried_page_names = []
             self.num_pages_queries = 0
-            first_page_url = "https://google.com/search?q=\"{}\"&hl=en&num=100".format(query.replace(' ', '+'))
+            query_plus = urllib.parse.quote_plus(query)
+            first_page_url = "https://google.com/search?q=\"{}\"&hl=en&num=100".format(query_plus)
             first_page = Page(query, first_page_url, 'Page 1')
             self.not_queried_page_names.append('Page 1')
             self.pages['Page 1'] = first_page
@@ -267,7 +351,6 @@ class QueryResult:
         book.save(export_file)
 
 
-
 class Command(BaseCommand):
     def __init__(self):
         super().__init__()
@@ -303,11 +386,14 @@ class Command(BaseCommand):
 
     def add_arguments(self, parser):
         parser.add_argument('--file', action='store', dest='file', required=True, type=str)
+        parser.add_argument('--auto', action='store_true', dest='automode', default=False)
 
     def populate_expressions_from_excel(self, file):
         xl = pd.ExcelFile(file)
 
         for sheet_name in xl.sheet_names:
+            if sheet_name.startswith('#'):
+                continue
             df = xl.parse(sheet_name, keep_default_na=False)
             df = df.fillna('')
 
@@ -333,14 +419,16 @@ class Command(BaseCommand):
     def make_query(self):
         for expression in self.expressions:
             query_result = QueryResult(expression)
-            query_finished = False
-            while not query_finished:
-                try:
-                    query_result.make_query_recursive(max_pages=100, browser_wrapper=self.browser_wrapper)
-                    query_finished = True
-                except CookiesPopulationRequiredException as e:
-                    cookies = e.cookies
-                    self.browser_wrapper.add_cookies(cookies)
+            query_result.make_query_recursive(max_pages=100, browser_wrapper=self.browser_wrapper)
+            # query_finished = True
+            #
+            # query_finished = False
+            # while not query_finished:
+            #     try:
+            #
+            #     except CookiesPopulationRequiredException as e:
+            #         cookies = e.cookies
+            #         self.browser_wrapper.refresh_cookies()
 
     def save(self):
         with open(self.query_result_cache_file_bak, 'wb') as f:
@@ -356,11 +444,48 @@ class Command(BaseCommand):
             name_to_counts[page.query] = count
         return name_to_counts
 
+    def test_2captcha(self):
+        site_url = 'https://www.google.com/recaptcha/api2/demo'
+        # site_url = 'https://google.com/search?q="Aldwych+Theatre+near+Nelson%27s+Column"&hl=en&num=100'
+        if not self.browser_wrapper.browser_initiated:
+            self.browser_wrapper.init_browser()
+
+        browser = self.browser_wrapper.browser
+        print('Querying url:' + site_url)
+        browser.get(url=site_url)
+
+        try:
+            captcha = browser.find_element_by_css_selector('iframe[role=presentation]')
+        except NoSuchElementException:
+            captcha = None
+
+        if captcha is not None:
+            if self.browser_wrapper.auto_solve_captcha:
+                send_notification('Google querier', 'Attempting to solve captcha')
+                print('Attempting to solve captcha')
+                old_page = browser.find_element_by_tag_name('html')
+                wait = WebDriverWait(browser, 1200)
+                try:
+                    captcha_solver = CaptchaSolver(self.browser_wrapper.browser, site_url)
+                    captcha_solver.run()
+                    wait.until(staleness_of(old_page))
+                except TimeoutException:
+                    send_notification('Google querier', 'Failed to solve captcha in the expected time')
+                    print('Failed to solve captcha in the expected time')
+                else:
+                    send_notification('Google querier', 'Captcha solved successfully, proceeding')
+                    print('Captcha solved successfully, proceeding')
+
+            print(browser.page_source)
+
     def handle(self, *args, **options):
         file = options['file']
-        self.populate_expressions_from_excel(file)
+        self.browser_wrapper.auto_solve_captcha = options['automode']
+        # self.populate_expressions_from_excel(file)
 
         # self.expressions = ['Northumberland avenue near trafalgar square']
         self.make_query()
+
+        # self.test_2captcha()
 
         x = 0

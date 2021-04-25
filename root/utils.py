@@ -66,12 +66,22 @@ def forget_password_handler(user):
 
 
 def send_capcha_email(email):
-    subject = 'Require Solving Capcha '
+    subject = 'Require Solving Capcha'
     template = 'capcha-solving-required'
 
     context = {}
     send_email_thread = SendEmailThread(subject, template, [email], context)
     send_email_thread.start()
+
+
+def send_capcha_unsolve_limit_reached(email):
+    subject = 'Capcha is unsolvable for more than 5 times'
+    template = 'captcha-unsolvable-notification'
+
+    context = {}
+    send_email_thread = SendEmailThread(subject, template, [email], context)
+    send_email_thread.start()
+
 
 
 def data_path(prefix, fullname, for_url=False):
