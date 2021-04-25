@@ -1,0 +1,8 @@
+{% load staticfiles %}
+{% load custom_tags %}
+
+Hi azizam,
+
+We got capcha again and need to be solved in 5 mins
+
+Love you

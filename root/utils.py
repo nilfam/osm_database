@@ -65,6 +65,15 @@ def forget_password_handler(user):
     send_email_thread.start()
 
 
+def send_capcha_email(email):
+    subject = 'Require Solving Capcha '
+    template = 'capcha-solving-required'
+
+    context = {}
+    send_email_thread = SendEmailThread(subject, template, [email], context)
+    send_email_thread.start()
+
+
 def data_path(prefix, fullname, for_url=False):
     slashed_url = os.path.join(settings.MEDIA_URL, prefix, fullname)
     unslashed_url = slashed_url[1:]
