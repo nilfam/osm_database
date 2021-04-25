@@ -1,22 +1,24 @@
 import os
 import pathlib
 import pickle
+import sys
 import urllib
 
 import pandas as pd
 from bs4 import BeautifulSoup
 from django.core.management import BaseCommand
 from openpyxl import load_workbook
+from progress.bar import Bar
 from selenium import webdriver
 from selenium.common.exceptions import TimeoutException, NoSuchElementException
 from selenium.webdriver.support import expected_conditions as ec
 from selenium.webdriver.support.expected_conditions import staleness_of
 from selenium.webdriver.support.wait import WebDriverWait
-from sortedcontainers import SortedSet
+from sortedcontainers import SortedSet, SortedDict
 from timeout_decorator import timeout_decorator
 
 from osm_database.management.commands.util import CaptchaSolver, send_notification, CaptchaUnsolvableException
-from root.utils import send_capcha_email
+from root.utils import send_capcha_email, send_capcha_unsolve_limit_reached
 
 from distutils import util as distutils_util
 
@@ -83,6 +85,11 @@ class CookiesPopulationRequiredException(Exception):
         self.cookies = cookies
 
 
+class ReloadRequiredException(Exception):
+    def __init__(self):
+        super(ReloadRequiredException, self).__init__()
+
+
 class Item:
     def __init__(self, url, excerpt):
         self.url = url
@@ -100,23 +107,61 @@ class BrowserWrapper:
         pathlib.Path(cache_dir).mkdir(parents=True, exist_ok=True)
 
         self.cookies_cache_file = os.path.join(self.cache_dir, 'cookies.pkl')
+        self.first_time = True
         self.browser_initiated = False
         self.auto_solve_captcha = False
 
     def init_browser(self):
+        options = webdriver.ChromeOptions()
+        chrome_prefs = {}
+        options.experimental_options["prefs"] = chrome_prefs
+        chrome_prefs["profile.default_content_settings"] = {"images": 2}
+        chrome_prefs["profile.managed_default_content_settings"] = {"images": 2}
+
         self.driver = webdriver.Chrome
-        self.browser = self.driver(executable_path=drivers_executables[self.driver])
+        self.browser = self.driver(executable_path=drivers_executables[self.driver], chrome_options=options)
         self.browser.set_window_size(1200, 900)
+
+        if self.first_time:
+            self.first_time = False
+            self.browser_initiated = True
+            return
 
         if os.path.isfile(self.cookies_cache_file):
             with open(self.cookies_cache_file, 'rb') as f:
                 cookies = pickle.load(f)
-                if cookies is not None:
-                    self._add_cookies(cookies)
+                self.add_cookies(cookies)
 
         self.browser_initiated = True
 
-    def _add_cookies(self, cookies):
+    def save_cookies(self):
+        print('Saving cookies')
+        with open(self.cookies_cache_file, 'wb') as f:
+            pickle.dump(self.cookies, f)
+
+    def add_cookies_and_bypass_token(self, cookies, token):
+        self.cookies = cookies
+        self.browser.delete_all_cookies()
+        self.browser.get('https://google.com/404error')
+        for cookie in self.cookies:
+
+            if cookie.get('name', None) == 'GOOGLE_ABUSE_EXEMPTION':
+                _GRECAPTCHA = token['_GRECAPTCHA']
+                expiry = int(token['expiry'])
+                secure = bool(distutils_util.strtobool(token['secure']))
+                value = token['value']
+
+                cookie['_GRECAPTCHA'] = _GRECAPTCHA
+                cookie['expiry'] = expiry
+                cookie['secure'] = secure
+                cookie['value'] = value
+                self.google_abuse_exemption_cookie = cookie
+
+            self.browser.add_cookie(cookie)
+
+        self.save_cookies()
+
+    def add_cookies(self, cookies):
         self.cookies = cookies
         self.browser.get('https://google.com/404error')
         for cookie in cookies:
@@ -125,11 +170,17 @@ class BrowserWrapper:
                 break
 
         self.refresh_cookies()
+        self.save_cookies()
+
+    def reload(self):
+        self.browser.get('https://google.com/404error')
+        self.refresh_cookies()
 
     def refresh_cookies(self):
         self.browser.delete_all_cookies()
-        for cookie in self.cookies:
-            self.browser.add_cookie(cookie)
+        if self.cookies is not None:
+            for cookie in self.cookies:
+                self.browser.add_cookie(cookie)
 
     def add_bypass_token(self, token):
         _GRECAPTCHA = token['_GRECAPTCHA']
@@ -144,10 +195,6 @@ class BrowserWrapper:
 
         self.refresh_cookies()
 
-    def save_cookies(self):
-        print('Saving cookies')
-        with open(self.cookies_cache_file, 'wb') as f:
-            pickle.dump(self.browser.get_cookies(), f)
 
 class Page:
     def __init__(self, query, url, name):
@@ -160,6 +207,30 @@ class Page:
         self.cache_dir = os.path.join(cache_dir, 'html', self.query.replace(' ', '_'))
         pathlib.Path(self.cache_dir).mkdir(parents=True, exist_ok=True)
 
+    def parse_html_get_next_pages(self):
+        cache_file_path = os.path.join(self.cache_dir, '{}.html'.format(self.name.replace(' ', '_')))
+
+        if not os.path.isfile(cache_file_path):
+            raise Exception('File {} doesn\'t exist. Please query it first')
+
+        with open(cache_file_path, 'r') as f:
+            response = f.read()
+
+        soup = BeautifulSoup(response)
+        body = soup.find('body')
+        try:
+            self.result_count = get_result_stats(body)
+        except:
+            self.result_count = -1
+        finally:
+            if self.result_count > 0:
+                get_searched_items(body, self.items)
+                next_pages = get_next_pages_links(body)
+            else:
+                next_pages = []
+
+        return next_pages
+
     def make_query_get_next_pages(self, browser_wrapper):
         cache_file_path = os.path.join(self.cache_dir, '{}.html'.format(self.name.replace(' ', '_')))
 
@@ -169,26 +240,32 @@ class Page:
 
             soup = BeautifulSoup(response)
             body = soup.find('body')
-            self.result_count = get_result_stats(body)
-            if self.result_count > 0:
-                get_searched_items(body, self.items)
-                next_pages = get_next_pages_links(body)
-            else:
-                next_pages = []
+            try:
+                self.result_count = get_result_stats(body)
+            except:
+                self.result_count = -1
+            finally:
+                if self.result_count > 0:
+                    # get_searched_items(body, self.items)
+                    next_pages = get_next_pages_links(body)
+                else:
+                    next_pages = []
         else:
             query_successful = False
             response = None
             retrials = 0
             bypass_token = None
+            cookies = None
             while not query_successful:
                 try:
                     if retrials > 0:
                         print('    Retry URL {}. This is the {} times'.format(self.url, retrials))
-                        if retrials > 5:
-                            send_capcha_email("n.aflaki@massey.ac.nz")
+                        if retrials >= 5:
+                            send_capcha_unsolve_limit_reached('y.fukuzawa@massey.ac.nz')
+                            sys.exit(1)
                     else:
                         print('Querying {}'.format(self.url))
-                    response, bypass_token = self.make_query(browser_wrapper)
+                    response, bypass_token, cookies = self.make_query(browser_wrapper)
                     query_successful = True
                 except CaptchaUnsolvableException as e:
                     retrials += 1
@@ -198,21 +275,30 @@ class Page:
 
             soup = BeautifulSoup(response)
             body = soup.find('body')
-            self.result_count = get_result_stats(body)
-            if self.result_count > 0:
-                get_searched_items(body, self.items)
-                next_pages = get_next_pages_links(body)
-            else:
-                next_pages = []
+            try:
+                self.result_count = get_result_stats(body)
+            except:
+                self.result_count = -1
+            finally:
+                if self.result_count > 0:
+                    # get_searched_items(body, self.items)
+                    next_pages = get_next_pages_links(body)
+                else:
+                    next_pages = []
             self.finalised = True
             with open(cache_file_path, 'w', encoding='utf-8') as htmlfile:
                 htmlfile.write(response)
 
-            if bypass_token is not None:
-                browser_wrapper.add_bypass_token(bypass_token)
+            if cookies is not None:
                 browser_wrapper.save_cookies()
 
-            # if bypass_token is not None:
+            # if cookies is not None and bypass_token is not None:
+            #     browser_wrapper.add_cookies_and_bypass_token(cookies, bypass_token)
+
+            # if cookies is not None:
+            #     browser_wrapper.add_cookies(cookies)
+
+            # elif bypass_token is not None:
             #     browser_wrapper.add_bypass_token(bypass_token)
 
         return next_pages
@@ -225,62 +311,56 @@ class Page:
 
         # print('Querying url:' + self.url)
         browser.get(url=self.url)
+        cookies = None
         bypass_token = None
 
-        captcha_not_present_or_solved = False
-        while not captcha_not_present_or_solved:
+        try:
+            captcha = browser.find_element_by_css_selector('iframe[role=presentation]')
+        except NoSuchElementException:
+            captcha = None
 
-            try:
-                captcha = browser.find_element_by_css_selector('iframe[role=presentation]')
-            except NoSuchElementException:
-                captcha_not_present_or_solved = True
-                captcha = None
+        if captcha is not None:
 
-            if captcha is not None:
-                if browser_wrapper.auto_solve_captcha:
-                    send_notification('Google querier', 'Attempting to solve captcha')
-                    print('Attempting to solve captcha')
-                    old_page = browser.find_element_by_tag_name('html')
-                    wait = WebDriverWait(browser, 1200)
-                    try:
-                        captcha_solver = CaptchaSolver(browser, self.url, browser_wrapper.google_abuse_exemption_cookie)
-                        bypass_token = captcha_solver.run()
-                        wait.until(staleness_of(old_page))
-                    except CaptchaUnsolvableException as e:
-                        send_notification('Google querier', 'Captcha is unsolvable. Page will reload with a new captcha')
-                        print('Captcha is unsolvable. Page will reload with a new captcha')
-                        raise e
-                    except TimeoutException:
-                        send_notification('Google querier', 'Failed to solve captcha in the expected time')
-                        print('Failed to solve captcha in the expected time')
-                    else:
-                        send_notification('Google querier', 'Captcha solved successfully, proceeding')
-                        print('Captcha solved successfully, proceeding')
+            if browser_wrapper.auto_solve_captcha:
+                send_notification('Google querier', 'Attempting to solve captcha')
+                print('Attempting to solve captcha')
+                old_page = browser.find_element_by_tag_name('html')
+                wait = WebDriverWait(browser, 1200)
+                try:
+                    captcha_solver = CaptchaSolver(browser, self.url, browser_wrapper.google_abuse_exemption_cookie)
+                    bypass_token = captcha_solver.run()
+                    wait.until(staleness_of(old_page))
+                except CaptchaUnsolvableException as e:
+                    send_notification('Google querier', 'Captcha is unsolvable. Page will reload with a new captcha')
+                    print('Captcha is unsolvable. Page will reload with a new captcha')
+                    raise e
+                except TimeoutException:
+                    send_notification('Google querier', 'Failed to solve captcha in the expected time')
+                    print('Failed to solve captcha in the expected time')
                 else:
-                    try:
-                        send_capcha_email('n.aflaki@massey.ac.nz')
-                    except:
-                        send_notification('Google querier', 'Unable to send email')
-                        print("Unable to send email")
+                    send_notification('Google querier', 'Captcha solved successfully, proceeding')
+                    print('Captcha solved successfully, proceeding')
+            else:
+                try:
+                    send_capcha_email('n.aflaki@massey.ac.nz')
+                except:
+                    send_notification('Google querier', 'Unable to send email')
+                    print("Unable to send email")
 
-                    send_notification('Google querier', 'Please solve the captcha now')
-                    print('\nPlease solve the captcha now')
+                send_notification('Google querier', 'Please solve the captcha now')
+                print('\nPlease solve the captcha now')
 
             wait = WebDriverWait(browser, 10)
             try:
                 wait.until(ec.presence_of_element_located(('css selector', '#result-stats')))
             except TimeoutException:
-                send_notification('Google querier', 'Failed to load the search page')
-                print('Failed to load the search page')
+                send_notification('Google querier', 'Failed to solve captcha in the expected time')
+                print('\nFailed to solve captcha in the expected time')
+                raise ReloadRequiredException()
             else:
-                send_notification('Google querier', 'Search page loaded successfully, proceeding')
-                print('Search page loaded successfully, proceeding')
-                captcha_not_present_or_solved = True
+                cookies = browser.get_cookies()
 
-            # At this point the bypass_token must also be not None
-            # raise CookiesPopulationRequiredException(cookies)
-
-        return browser.page_source, bypass_token
+        return browser.page_source, bypass_token, cookies
 
 
 class QueryResult:
@@ -311,6 +391,23 @@ class QueryResult:
             page_name = self.not_queried_page_names[0]
             page_to_query = self.pages[page_name]
             next_pages = page_to_query.make_query_get_next_pages(browser_wrapper)
+
+            for next_page_name, next_page_url in next_pages:
+                if next_page_name not in self.pages:
+                    self.pages[next_page_name] = Page(self.query, next_page_url, next_page_name)
+                    self.not_queried_page_names.append(next_page_name)
+
+            self.not_queried_page_names = self.not_queried_page_names[1:]
+            self.num_pages_queries += 1
+
+            with open(self.cache_file, 'wb') as f:
+                pickle.dump(self, f)
+
+    def parse_html_recursive(self, max_pages):
+        while len(self.not_queried_page_names) > 0 and self.num_pages_queries < max_pages:
+            page_name = self.not_queried_page_names[0]
+            page_to_query = self.pages[page_name]
+            next_pages = page_to_query.parse_html_get_next_pages()
 
             for next_page_name, next_page_url in next_pages:
                 if next_page_name not in self.pages:
@@ -367,7 +464,7 @@ class Command(BaseCommand):
             with open(self.expression_cache, 'rb') as f:
                 self.expressions = pickle.load(f)
         else:
-            self.expressions = SortedSet()
+            self.expressions = SortedDict()
 
         if os.path.isfile(self.query_result_cache_file):
             with open(self.query_result_cache_file, 'rb') as f:
@@ -410,25 +507,26 @@ class Command(BaseCommand):
 
             for preposition in prepositions:
                 for locatum in locatums:
-                    expression = locatum + ' ' + preposition + ' ' + sheet_name
-                    self.expressions.add(expression)
+                    expression = locatum +' * ' + preposition + ' ' + sheet_name
+                    self.expressions[expression] = (locatum, preposition, sheet_name)
 
         with open(self.expression_cache, 'wb') as f:
             pickle.dump(self.expressions, f)
 
     def make_query(self):
-        for expression in self.expressions:
+        expression_index = 0
+        expressions_count = len(self.expressions)
+        for expression in self.expressions.keys():
+            print("Querying expression #{}/{}".format(expression_index, expressions_count))
             query_result = QueryResult(expression)
-            query_result.make_query_recursive(max_pages=100, browser_wrapper=self.browser_wrapper)
-            # query_finished = True
-            #
-            # query_finished = False
-            # while not query_finished:
-            #     try:
-            #
-            #     except CookiesPopulationRequiredException as e:
-            #         cookies = e.cookies
-            #         self.browser_wrapper.refresh_cookies()
+            query_finished = False
+            while not query_finished:
+                try:
+                    query_result.make_query_recursive(max_pages=100, browser_wrapper=self.browser_wrapper)
+                    query_finished = True
+                except ReloadRequiredException as e:
+                    self.browser_wrapper.reload()
+            expression_index += 1
 
     def save(self):
         with open(self.query_result_cache_file_bak, 'wb') as f:
@@ -446,7 +544,6 @@ class Command(BaseCommand):
 
     def test_2captcha(self):
         site_url = 'https://www.google.com/recaptcha/api2/demo'
-        # site_url = 'https://google.com/search?q="Aldwych+Theatre+near+Nelson%27s+Column"&hl=en&num=100'
         if not self.browser_wrapper.browser_initiated:
             self.browser_wrapper.init_browser()
 
@@ -478,13 +575,64 @@ class Command(BaseCommand):
 
             print(browser.page_source)
 
+    def parse_html(self):
+        queries = {}
+        for expression, (locatum, preposition, sheet_name) in self.expressions.items():
+            query_result = QueryResult(expression)
+            query_result.parse_html_recursive(max_pages=100)
+            queries[expression] = (locatum, preposition, sheet_name, query_result)
+        return queries
+
+    def produce_report(self, queries):
+        headings = ['Locatum', 'Preposition', 'Relatum', 'Page #', 'URL', 'Num results', 'Item Link', 'Item Excerpt']
+        df = pd.DataFrame(columns=headings)
+        index = 0
+        bar = Bar('Exporting Excel file', max=len(queries))
+        for expression, (locatum, preposition, sheet_name, query_result) in queries.items():
+            total_page_count = len(query_result.pages)
+            page_index = 1
+            for page_name, page in query_result.pages.items():
+                url = page.url
+                page_number = '{}/{}'.format(page_index, total_page_count)
+                num_results = page.result_count
+                page_index += 1
+                if len(page.items) == 0:
+                    row = [locatum, preposition, sheet_name, page_number, url, num_results, '', '']
+                    df.loc[index] = row
+                    index += 1
+                else:
+                    for item in page.items:
+                        row = [locatum, preposition, sheet_name, page_number, url, num_results, item.url, item.excerpt]
+                        df.loc[index] = row
+                        index += 1
+            bar.next()
+        bar.finish()
+
+        export_file_path = os.path.join(self.cache_dir, 'export.xlsx')
+        with pd.ExcelWriter(export_file_path, mode='w') as writer:
+            df.to_excel(writer)
+
+        book = load_workbook(export_file_path)
+        ws = book.active
+        dims = {}
+        for row in ws.rows:
+            for cell in row:
+                if cell.value:
+                    dims[cell.column_letter] = max((dims.get(cell.column_letter, 0), len(str(cell.value))))
+        for col, value in dims.items():
+            ws.column_dimensions[col].width = value
+
+        book.save(export_file_path)
+
     def handle(self, *args, **options):
         file = options['file']
         self.browser_wrapper.auto_solve_captcha = options['automode']
-        # self.populate_expressions_from_excel(file)
+        self.populate_expressions_from_excel(file)
 
-        # self.expressions = ['Northumberland avenue near trafalgar square']
         self.make_query()
+
+        # queries = self.parse_html()
+        # self.produce_report(queries)
 
         # self.test_2captcha()
 
