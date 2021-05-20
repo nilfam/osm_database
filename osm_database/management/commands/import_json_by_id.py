@@ -226,8 +226,9 @@ class Command(BaseCommand):
             try:
                 self.process_file(filename, existing_osm_ids, commit)
                 processed.add(filename)
-                with open(cache_file, 'wb') as f:
-                    pickle.dump(processed, f, pickle.HIGHEST_PROTOCOL)
+                if commit:
+                    with open(cache_file, 'wb') as f:
+                        pickle.dump(processed, f, pickle.HIGHEST_PROTOCOL)
             except Exception:
                 traceback.print_exc()
             bar.next()

@@ -115,8 +115,8 @@ class Command(BaseCommand):
         if not os.path.isdir(folder):
             raise Exception('Folder {} does not exist'.format(folder))
 
-        if os.path.isfile('osm-ways.pkl'):
-            with open('osm-ways.pkl', 'rb') as f:
+        if os.path.isfile('osm-ways-2.pkl'):
+            with open('osm-ways-2.pkl', 'rb') as f:
                 ways = pickle.load(f)
         else:
             ways = set()
@@ -125,7 +125,7 @@ class Command(BaseCommand):
                 if filename.endswith(".osm"):
                     parse_osm_way(ways, folder, filename)
 
-            with open('osm-ways.pkl', 'wb') as f:
+            with open('osm-ways-2.pkl', 'wb') as f:
                 pickle.dump(ways, f)
 
         results_dir = 'osm_query_results'

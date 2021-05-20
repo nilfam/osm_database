@@ -331,9 +331,6 @@ class Command(BaseCommand):
 
                 dfs[centre_name] = df
 
-        with open('/tmp/blah.pkl', 'wb') as f:
-            pickle.dump(dfs_by_type, f)
-
         for geojson_type, dfs in dfs_by_type.items():
             export_file_path = 'files/xlsx/{}-nearby-{}.xlsx'.format(centre_file_name, geojson_type)
             writer = pd.ExcelWriter(export_file_path, engine='xlsxwriter')
