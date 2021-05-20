@@ -1,28 +1,11 @@
-import csv
-import os
-import pickle
-import time
 import warnings
-from collections import OrderedDict
-from decimal import Decimal
-from threading import Thread
 
-import requests
-from django.core.management import BaseCommand
 from progress.bar import Bar
 from urllib3.exceptions import InsecureRequestWarning
 
 from osm_database.models import *
 
 warnings.filterwarnings("ignore", category=InsecureRequestWarning)
-
-import pandas as pd
-
-from shapely.geometry import Point as GeoPoint
-from shapely.geometry import Polygon as GeoPolygon
-from shapely.ops import nearest_points
-from qhull_2d import *
-from min_bounding_rect import *
 
 
 def extract_points_for_polygons(osm_entities):
@@ -160,82 +143,6 @@ def extract_points_for_point(osm_entities):
     bar.finish()
     geojson_to_point_id = {x: y for x, y in points.values_list('geojson_id', 'id')}
     return geojson_to_point_id, point_ids_to_geopoints
-
-
-class CaptchaUnsolvableException(Exception):
-    def __init__(self):
-        super(CaptchaUnsolvableException, self).__init__()
-
-
-class CaptchaSolver:
-    def __init__(self, browser, pageurl, google_abuse_exemption_cookie=None):
-        self.browser = browser
-        self.api_key = '2bd505f9784c9de73e6f74c1fff4fe29'
-        self.pageurl = pageurl
-        self.site_key = None
-        self.request_id = None
-        self.google_abuse_exemption_cookie = google_abuse_exemption_cookie
-
-    def run(self):
-        self._get_site_key()
-        self._submit_2captcha()
-        return self._retrieve_captcha_response()
-
-    def _get_site_key(self):
-        g_recaptcha_element = self.browser.find_element_by_css_selector('.g-recaptcha')
-        self.site_key = g_recaptcha_element.get_attribute('data-sitekey')
-        self.data_s = g_recaptcha_element.get_attribute('data-s')
-
-    def _submit_2captcha(self):
-        form = {"method": "userrecaptcha",
-                "googlekey": self.site_key,
-                "data-s": self.data_s,
-                "key": self.api_key,
-                "pageurl": self.pageurl,
-                "json": 1}
-
-        if self.google_abuse_exemption_cookie is not None:
-            cookies_str = ";".join(['{}:{}'.format(k, v) for k, v in self.google_abuse_exemption_cookie.items()])
-            form['cookies'] = cookies_str
-
-        print('Submitting request for captcha solver: {}'.format(form))
-
-        response = requests.post('http://2captcha.com/in.php', data=form)
-        response_json = response.json()
-        error_text = response_json.get('error_text', '')
-        if error_text != '':
-            send_notification('Google Querier', '2Captcha unsuccessful. Message: {}'.format(error_text))
-            print(form, file=sys.stderr)
-            raise Exception('Query unsuccessful: {}'.format(error_text))
-        self.request_id = response_json['request']
-        print('Request ID = {}'.format(self.request_id))
-
-    def _retrieve_captcha_response(self):
-        url = f"http://2captcha.com/res.php?key={self.api_key}&action=get&id={self.request_id}&json=1"
-        captcha_solved_successful = False
-        res_json = None
-        while not captcha_solved_successful:
-            res = requests.get(url)
-            res_json = res.json()
-            response_status = res_json['status']
-            if response_status == 0:
-                response = res_json['request']
-                if response == 'ERROR_CAPTCHA_UNSOLVABLE':
-                    raise CaptchaUnsolvableException()
-                else:
-                    time.sleep(3)
-            else:
-                response_id = res_json['request']
-                print(f'Get response: {response_id}')
-                populate_response_js = f'document.getElementById("g-recaptcha-response").innerHTML="{response_id}";'
-                self.browser.execute_script(populate_response_js)
-                self.browser.find_element_by_id('captcha-form').submit()
-                # self.browser.find_element_by_id("recaptcha-demo-submit").submit()
-                captcha_solved_successful = True
-                print('Response populated, please submit form')
-
-        bypass_token = res_json.get('cookies', None)
-        return bypass_token
 
 
 import subprocess

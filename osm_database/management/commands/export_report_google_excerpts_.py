@@ -69,11 +69,6 @@ class CookiesPopulationRequiredException(Exception):
         self.cookies = cookies
 
 
-class ReloadRequiredException(Exception):
-    def __init__(self):
-        super(ReloadRequiredException, self).__init__()
-
-
 class Item:
     def __init__(self, url, excerpt):
         self.url = url
