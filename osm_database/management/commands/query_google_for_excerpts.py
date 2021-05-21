@@ -281,8 +281,9 @@ class Command(BaseCommand):
 
     def make_query(self):
         expression_index = 0
-        expressions_count = len(self.expressions)
-        for expression in self.expressions.keys():
+        expressions = list(self.expressions)[15000:]
+        expressions_count = len(expressions)
+        for expression in expressions:
             print("Querying expression #{}/{}".format(expression_index, expressions_count))
             query_result = QueryResult(expression)
             query_finished = False

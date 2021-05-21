@@ -142,76 +142,11 @@ class BrowserWrapper:
             self.browser_initiated = True
             return
 
-        # if os.path.isfile(self.cookies_cache_file):
-        #     with open(self.cookies_cache_file, 'rb') as f:
-        #         cookies = pickle.load(f)
-        #         self.add_cookies(cookies)
-
-        if self.cookies is not None:
-            self.add_cookies(self.cookies)
-
         self.browser_initiated = True
-
-    def save_cookies(self):
-        print('Saving cookies')
-        with open(self.cookies_cache_file, 'wb') as f:
-            pickle.dump(self.cookies, f)
-
-    def add_cookies_and_bypass_token(self, cookies, token):
-        self.cookies = cookies
-        self.browser.delete_all_cookies()
-        self.browser.get('https://google.com/404error')
-        for cookie in self.cookies:
-
-            if cookie.get('name', None) == 'GOOGLE_ABUSE_EXEMPTION':
-                _GRECAPTCHA = token['_GRECAPTCHA']
-                expiry = int(token['expiry'])
-                secure = bool(distutils_util.strtobool(token['secure']))
-                value = token['value']
-
-                cookie['_GRECAPTCHA'] = _GRECAPTCHA
-                cookie['expiry'] = expiry
-                cookie['secure'] = secure
-                cookie['value'] = value
-                self.google_abuse_exemption_cookie = cookie
-
-            self.browser.add_cookie(cookie)
-
-        self.save_cookies()
-
-    def add_cookies(self, cookies):
-        self.cookies = cookies
-        self.browser.get('https://google.com/404error')
-        for cookie in cookies:
-            if cookie.get('name', None) == 'GOOGLE_ABUSE_EXEMPTION':
-                self.google_abuse_exemption_cookie = cookie
-                break
-
-        self.refresh_cookies()
-        # self.save_cookies()
 
     def reload(self):
         self.browser.quit()
         self.init_browser()
-
-    def refresh_cookies(self):
-        self.browser.delete_all_cookies()
-        if self.cookies is not None:
-            for cookie in self.cookies:
-                self.browser.add_cookie(cookie)
-
-    def add_bypass_token(self, token):
-        _GRECAPTCHA = token['_GRECAPTCHA']
-        expiry = int(token['expiry'])
-        secure = bool(distutils_util.strtobool(token['secure']))
-        value = token['value']
-
-        self.google_abuse_exemption_cookie['_GRECAPTCHA'] = _GRECAPTCHA
-        self.google_abuse_exemption_cookie['expiry'] = expiry
-        self.google_abuse_exemption_cookie['secure'] = secure
-        self.google_abuse_exemption_cookie['value'] = value
-
-        self.refresh_cookies()
 
     def make_query_retrial_if_fail(self, url):
         if not self.browser_initiated:
@@ -226,14 +161,13 @@ class BrowserWrapper:
                     if retrials >= 3:
                         retrials = 0
                         send_notification('Googler querier', 'Max retrial exceeded')
-                        self.reload()
+                        raise Exception('Max retrial exceeded')
                     else:
                         response, bypass_token, cookies = self.make_query(url)
                         query_successful = True
             except CaptchaUnsolvableException as e:
-                retrials += 1
+                self.reload()
             except ReloadRequiredException as e:
-                retrials = 0
                 self.reload()
             except:
                 raise
