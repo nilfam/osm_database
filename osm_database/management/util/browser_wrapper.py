@@ -59,6 +59,7 @@ class CaptchaSolver:
                 "data-s": self.data_s,
                 "key": self.api_key,
                 "pageurl": self.pageurl,
+                "useragent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/90.0.4430.212 Safari/537.36",
                 "json": 1}
 
         if self.google_abuse_exemption_cookie is not None:
@@ -191,7 +192,7 @@ class BrowserWrapper:
                 old_page = self.browser.find_element_by_tag_name('html')
                 wait = WebDriverWait(self.browser, 1200)
                 try:
-                    captcha_solver = CaptchaSolver(self.browser, url, self.google_abuse_exemption_cookie)
+                    captcha_solver = CaptchaSolver(self.browser, self.browser.current_url, self.google_abuse_exemption_cookie)
                     bypass_token = captcha_solver.run()
                     wait.until(staleness_of(old_page))
                 except CaptchaUnsolvableException as e:
