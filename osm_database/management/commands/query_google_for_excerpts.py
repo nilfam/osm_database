@@ -3,6 +3,7 @@ import pathlib
 import pickle
 import sys
 import urllib
+import zipfile
 
 import pandas as pd
 from bs4 import BeautifulSoup
@@ -108,15 +109,28 @@ class Page:
 
     def make_query_get_next_pages(self, browser_wrapper):
         cache_file_path = os.path.join(self.cache_dir, '{}.html'.format(self.name.replace(' ', '_')))
+        cache_file_path_zip = os.path.join(self.cache_dir, '{}.zip'.format(self.name.replace(' ', '_')))
 
-        if os.path.isfile(cache_file_path):
-            with open(cache_file_path, 'r') as f:
-                response = f.read()
+        if os.path.isfile(cache_file_path_zip):
+            if os.path.isfile(cache_file_path):
+                return []
+            else:
+                #     with open(cache_file_path, 'r') as f:
+                #         response = f.read()
+
+                zf = zipfile.ZipFile(cache_file_path_zip, 'r')
+                response = zf.read('content.html').decode('utf-8')
 
         else:
             response = browser_wrapper.make_query_retrial_if_fail(self.url)
-            with open(cache_file_path, 'w', encoding='utf-8') as htmlfile:
-                htmlfile.write(response)
+            # with open(cache_file_path, 'w', encoding='utf-8') as htmlfile:
+            #     htmlfile.write(response)
+
+            zf = zipfile.ZipFile(cache_file_path_zip, mode='w', compression=zipfile.ZIP_DEFLATED)
+            try:
+                zf.writestr('content.html', response)
+            finally:
+                zf.close()
 
         soup = BeautifulSoup(response)
         body = soup.find('body')
@@ -126,7 +140,6 @@ class Page:
             self.result_count = -1
         finally:
             if self.result_count > 0:
-                # get_searched_items(body, self.items)
                 try:
                     next_pages = get_next_pages_links(body)
                 except:
@@ -277,11 +290,13 @@ class Command(BaseCommand):
             for preposition in prepositions:
                 for locatum in locatums:
                     expression = locatum + ' ' + preposition + ' ' + sheet_name
+                    expression2 = locatum + ' * ' + preposition + ' ' + sheet_name
                     self.expressions[expression] = (locatum, preposition, sheet_name)
+                    self.expressions[expression2] = (locatum, preposition, sheet_name)
 
     def make_query(self):
         expression_index = 0
-        expressions = list(self.expressions)[15000:]
+        expressions = list(self.expressions)
         expressions_count = len(expressions)
         for expression in expressions:
             print("Querying expression #{}/{}".format(expression_index, expressions_count))
@@ -367,7 +382,4 @@ class Command(BaseCommand):
 
         # queries = self.parse_html()
         # self.produce_report(queries)
-
-        # self.test_2captcha()
-
         x = 0

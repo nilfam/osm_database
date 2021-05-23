@@ -2,6 +2,7 @@ import os
 import pathlib
 import pickle
 import urllib
+import zipfile
 
 import pandas as pd
 from bs4 import BeautifulSoup
@@ -15,7 +16,6 @@ from osm_database.management.commands.util import send_notification
 current_dir = os.path.dirname(os.path.abspath(__file__))
 dir_parts = current_dir.split('/')
 cache_dir = os.path.join('/'.join(dir_parts[0:dir_parts.index('management')]), 'cache', 'query_google_for_excerpts')
-util_dir = os.path.join('/'.join(dir_parts[0:dir_parts.index('commands')]), 'util')
 
 
 def get_result_stats(body):
@@ -83,17 +83,36 @@ class Page:
         self.query = query
         self.result_count = 0
         self.finalised = False
-        self.cache_dir = os.path.join(cache_dir, 'html', self.query.replace(' ', '_'))
+        self.cache_dir = os.path.join(cache_dir, 'html', self.query.replace(' ', '_').replace('/', '_or_'))
         pathlib.Path(self.cache_dir).mkdir(parents=True, exist_ok=True)
 
     def parse_html_get_next_pages(self):
-        cache_file_path = os.path.join(self.cache_dir, '{}.html'.format(self.name.replace(' ', '_')))
+        cache_file_path = os.path.join(self.cache_dir, '{}.html'.format(self.name.replace(' ', '_').replace('/', '_or_')))
+        cache_file_path_zip = os.path.join(self.cache_dir, '{}.zip'.format(self.name.replace(' ', '_').replace('/', '_or_')))
 
-        if not os.path.isfile(cache_file_path):
-            raise Exception('File {} doesn\'t exist. Please query it first')
+        if not os.path.isfile(cache_file_path) and not os.path.isfile(cache_file_path_zip):
+            raise Exception('File {} doesn\'t exist. Please query it first'.format(cache_file_path))
 
-        with open(cache_file_path, 'r') as f:
-            response = f.read()
+        if os.path.isfile(cache_file_path):
+            with open(cache_file_path, 'r') as f:
+                response = f.read()
+        elif os.path.isfile(cache_file_path_zip):
+            zf = zipfile.ZipFile(cache_file_path_zip, 'r')
+            response = zf.read('content.html')
+
+        # if not os.path.isfile(cache_file_path_zip):
+        #     with open(cache_file_path, 'r') as f:
+        #         response = f.read()
+        #
+        #     print("Zipping file {} into {}".format(cache_file_path, cache_file_path_zip))
+        #     zf = zipfile.ZipFile(cache_file_path_zip, mode='w', compression=compression=zipfile.ZIP_DEFLATED)
+        #     try:
+        #         zf.writestr('content.html', response)
+        #     finally:
+        #         zf.close()
+        # else:
+        #     zf = zipfile.ZipFile(cache_file_path_zip, 'r')
+        #     response = zf.read('content.html')
 
         soup = BeautifulSoup(response, 'lxml')
         body = soup.find('body')
@@ -115,7 +134,7 @@ class QueryResult:
     def __init__(self, query):
         self.query = query
         self.cache_dir = os.path.join('data', self.query.replace(' ', '_'))
-        self.cache_file = os.path.join(self.cache_dir, 'query_result.pkl')
+        self.cache_file = os.path.join(self.cache_dir, 'query_result-2.pkl')
         pathlib.Path(self.cache_dir).mkdir(parents=True, exist_ok=True)
 
         self.pages = {}
@@ -147,17 +166,14 @@ class Command(BaseCommand):
         self.server = None
         self.context = None
         self.cache_dir = cache_dir
-        self.cache_file = os.path.join(self.cache_dir, 'query_results_for_report.pkl')
+        self.cache_file = os.path.join(self.cache_dir, 'query_results_for_report-2.pkl')
         pathlib.Path(cache_dir).mkdir(parents=True, exist_ok=True)
 
         self.expressions = SortedDict()
 
         self.successful_queried_expressions = set()
         self.pages = []
-
-    def add_arguments(self, parser):
-        parser.add_argument('--file', action='store', dest='file', required=True, type=str)
-        parser.add_argument('--auto', action='store_true', dest='automode', default=False)
+        self.with_asterisk = False
 
     def populate_expressions_from_excel(self, file):
         xl = pd.ExcelFile(file)
@@ -181,11 +197,12 @@ class Command(BaseCommand):
 
             for preposition in prepositions:
                 for locatum in locatums:
-                    expression = locatum + ' ' + preposition + ' ' + sheet_name
-                    expression2 = locatum + ' * ' + preposition + ' ' + sheet_name
-                    self.expressions[expression] = (locatum, preposition, sheet_name)
-                    self.expressions[expression2] = (locatum, preposition, sheet_name)
+                    if self.with_asterisk:
+                        expression = locatum + '*' + preposition + ' ' + sheet_name
+                    else:
+                        expression = locatum + ' ' + preposition + ' ' + sheet_name
 
+                    self.expressions[expression] = (locatum, preposition, sheet_name)
 
     def get_name_to_counts(self):
         name_to_counts = {}
@@ -203,19 +220,16 @@ class Command(BaseCommand):
             query_result = QueryResult(expression)
             query_result.parse_html_recursive(max_pages=100)
             queries[expression] = (locatum, preposition, sheet_name, query_result)
-
+            bar.next()
         bar.finish()
         return queries
 
-    def produce_report(self, queries):
+    def produce_report(self, export_file_name, queries, exclude_no_result):
         headings = ['Locatum', 'Preposition', 'Relatum', 'Page #', 'URL', 'Num results', 'Item Excerpt', 'Item Link']
         df = pd.DataFrame(columns=headings)
         index = 0
         bar = Bar('Exporting Excel file', max=len(queries))
         for expression, (locatum, preposition, sheet_name, query_result) in queries.items():
-            if '*' not in expression:
-                bar.next()
-                continue
             if locatum.strip().lower() == sheet_name.strip().lower():
                 bar.next()
                 continue
@@ -224,6 +238,10 @@ class Command(BaseCommand):
             num_results = 0
             for page_name, page in query_result.pages.items():
                 num_results += len(page.items)
+
+            if exclude_no_result and num_results == 0:
+                bar.next()
+                continue
 
             for page_name, page in query_result.pages.items():
                 url = page.url
@@ -241,21 +259,24 @@ class Command(BaseCommand):
             bar.next()
         bar.finish()
 
-        export_file_path = os.path.join(self.cache_dir, 'export_asterisk.xlsx')
-        with pd.ExcelWriter(export_file_path, mode='w') as writer:
-            df.to_excel(writer)
+        if export_file_name.endswith('.xlsx'):
+            with pd.ExcelWriter(export_file_name, mode='w') as writer:
+                df.to_excel(writer)
 
-        book = load_workbook(export_file_path)
-        ws = book.active
-        dims = {}
-        for row in ws.rows:
-            for cell in row:
-                if cell.value:
-                    dims[cell.column_letter] = max((dims.get(cell.column_letter, 0), len(str(cell.value))))
-        for col, value in dims.items():
-            ws.column_dimensions[col].width = value
+            book = load_workbook(export_file_name)
+            ws = book.active
+            dims = {}
+            for row in ws.rows:
+                for cell in row:
+                    if cell.value:
+                        dims[cell.column_letter] = max((dims.get(cell.column_letter, 0), len(str(cell.value))))
+            for col, value in dims.items():
+                ws.column_dimensions[col].width = value
 
-        book.save(export_file_path)
+            book.save(export_file_name)
+
+        else:
+            df.to_csv(export_file_name, sep='\t', encoding='utf-8')
 
     def analyse(self, locatum, preposition, relatum):
         expression = '{} {} {}'.format(locatum, preposition, relatum)
@@ -265,8 +286,17 @@ class Command(BaseCommand):
         query_result = QueryResult(expression)
         query_result.parse_html_recursive(max_pages=100)
 
+    def add_arguments(self, parser):
+        parser.add_argument('--file', action='store', dest='file', required=True, type=str)
+        parser.add_argument('--with-asterisk', action='store_true', dest='with_asterisk', default=False)
+        parser.add_argument('--exclude-no-result', action='store_true', dest='exclude_no_result', default=False)
+        parser.add_argument('--format', action='store', dest='format', default='xlsx')
+
     def handle(self, *args, **options):
         file = options['file']
+        self.with_asterisk = options['with_asterisk']
+        exclude_no_result = options['exclude_no_result']
+        format = options['format']
         self.populate_expressions_from_excel(file)
 
         # self.analyse('Royal Opera House', 'at',	'Trafalgar Square')
@@ -277,11 +307,19 @@ class Command(BaseCommand):
         else:
             queries = {}
 
-        self.parse_html(queries)
-        with open(self.cache_file, 'wb') as f:
-            pickle.dump(queries, f)
-        self.produce_report(queries)
+        try:
+            self.parse_html(queries)
+        finally:
+            with open(self.cache_file, 'wb') as f:
+                pickle.dump(queries, f)
+
+        file_name = os.path.splitext(os.path.split(file)[1])[0]
+        xlsx_dir = os.path.join(self.cache_dir, 'xlsx')
+        pathlib.Path(xlsx_dir).mkdir(parents=True, exist_ok=True)
+        export_file_name = '{}-report{}{}.{}'.format(file_name, '-asterisk' if self.with_asterisk else '',
+                                                     '-no-empty' if exclude_no_result else '', format)
+        export_file_path = os.path.join(self.cache_dir, 'xlsx', export_file_name)
+
+        self.produce_report(export_file_path, queries, exclude_no_result)
 
         send_notification('Producing Excel file', 'Finished')
-
-        # x = 0
