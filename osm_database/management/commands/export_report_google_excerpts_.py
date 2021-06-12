@@ -198,7 +198,7 @@ class Command(BaseCommand):
             for preposition in prepositions:
                 for locatum in locatums:
                     if self.with_asterisk:
-                        expression = locatum + '*' + preposition + ' ' + sheet_name
+                        expression = locatum + ' * ' + preposition + ' ' + sheet_name
                     else:
                         expression = locatum + ' ' + preposition + ' ' + sheet_name
 
@@ -228,8 +228,10 @@ class Command(BaseCommand):
         headings = ['Locatum', 'Preposition', 'Relatum', 'Page #', 'URL', 'Num results', 'Item Excerpt', 'Item Link']
         df = pd.DataFrame(columns=headings)
         index = 0
-        bar = Bar('Exporting Excel file', max=len(queries))
-        for expression, (locatum, preposition, sheet_name, query_result) in queries.items():
+        bar = Bar('Exporting Excel file', max=len(self.expressions))
+        for expresion in self.expressions:
+            locatum, preposition, sheet_name, query_result = queries[expresion]
+
             if locatum.strip().lower() == sheet_name.strip().lower():
                 bar.next()
                 continue
