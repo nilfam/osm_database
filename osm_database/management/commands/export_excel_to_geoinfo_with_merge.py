@@ -1,5 +1,6 @@
 import pickle
 import warnings
+import os
 
 from django.core.management import BaseCommand
 from progress.bar import Bar
