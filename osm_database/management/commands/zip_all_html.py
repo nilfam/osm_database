@@ -7,8 +7,8 @@ from django.core.management import BaseCommand
 from progress.bar import Bar
 
 current_dir = os.path.dirname(os.path.abspath(__file__))
-dir_parts = current_dir.split('/')
-cache_dir = os.path.join('/'.join(dir_parts[0:dir_parts.index('management')]), 'cache')
+dir_parts = current_dir.split(os.path.sep)
+cache_dir = os.path.join(os.path.sep.join(dir_parts[0:dir_parts.index('management')]), 'cache')
 
 
 class Command(BaseCommand):

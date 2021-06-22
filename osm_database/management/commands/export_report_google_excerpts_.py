@@ -14,8 +14,8 @@ from sortedcontainers import SortedDict
 from osm_database.management.commands.util import send_notification
 
 current_dir = os.path.dirname(os.path.abspath(__file__))
-dir_parts = current_dir.split('/')
-cache_dir = os.path.join('/'.join(dir_parts[0:dir_parts.index('management')]), 'cache', 'query_google_for_excerpts')
+dir_parts = current_dir.split(os.path.sep)
+cache_dir = os.path.join(os.path.sep.join(dir_parts[0:dir_parts.index('management')]), 'cache', 'query_google_for_excerpts')
 
 
 def get_result_stats(body):

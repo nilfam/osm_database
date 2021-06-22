@@ -14,8 +14,8 @@ pattern = re.compile(r'([\d\-.]+ [\d\-.]+)', re.I | re.U)
 
 current_dir = os.path.dirname(os.path.abspath(__file__))
 script_name = os.path.split(__file__)[1][0:-3]
-dir_parts = current_dir.split('/')
-cache_dir = os.path.join('/'.join(dir_parts[0:dir_parts.index('management')]), 'cache', script_name)
+dir_parts = current_dir.split(os.path.sep)
+cache_dir = os.path.join(os.path.sep.join(dir_parts[0:dir_parts.index('management')]), 'cache', script_name)
 
 
 def fix_wkt_str_if_necessary(wkt_str):
