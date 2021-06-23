@@ -154,16 +154,13 @@ class Command(BaseCommand):
             file_path = os.path.join(img_dir, file_name)
 
             subcategories = category_details['subcategories']
-
-
-            fg = plt.figure(figsize=(10, 7))
-            # plt.xticks(rotation=90, ha='right')
-            # plt.subplots_adjust(bottom=0.4, top=0.99)
+            plt.figure(figsize=(10, 7))
 
             import itertools
-            marker = itertools.cycle(("$f$", 'o', r"$\mathcal{A}$","$1$", 's',5, 'h', 1))
-
             colours = itertools.cycle(('lightsteelblue', 'crimson', 'yellow', 'b', 'black', 'orange', 'lightcoral', 'lime', 'brown', 1))
+
+            subcategories_names = []
+            subcategories_indx = []
 
             for ind, subcategory_data in enumerate(subcategories, 1):
                 subcategory = subcategory_data['subcategory']
@@ -171,17 +168,22 @@ class Command(BaseCommand):
                 x_data = np.array(df[datapoint_column_name]).astype(np.float)
                 y_data = np.array(df[value_column_name]).astype(np.float)
 
-                s = np.log2(y_data + 1).astype(np.float) * 70
+                s = np.log10(y_data + 1).astype(np.float) * 700
 
                 if not yaxis_is_frequency:
                     y_data.fill(ind)
                 plt.scatter(x=x_data, y=y_data, s=s, c=next(colours), label=subcategory, alpha=0.5, edgecolor='black', linewidth=1)
+                subcategories_names.append(subcategory)
+                subcategories_indx.append(ind)
 
-            legend = plt.legend(fontsize=10)
-
-            for legend_handler in legend.legendHandles:
-                legend_handler._sizes = [200]
-            plt.xlabel(full_labels.get(datapoint_column_name, datapoint_column_name))
+            if yaxis_is_frequency:
+                legend = plt.legend(fontsize=10)
+                for legend_handler in legend.legendHandles:
+                    legend_handler._sizes = [200]
+                plt.xlabel(full_labels.get(datapoint_column_name, datapoint_column_name))
+            else:
+                plt.yticks(subcategories_indx, labels=subcategories_names)
+                plt.ylim([subcategories_indx[0] - 1, subcategories_indx[-1] + 1])
 
             if not yaxis_is_frequency:
                 y_label = 'Preposition'
