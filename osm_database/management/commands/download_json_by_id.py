@@ -14,7 +14,7 @@ warnings.filterwarnings("ignore", category=InsecureRequestWarning)
 from bs4 import BeautifulSoup
 from django.core.management import BaseCommand
 
-url_for_way = 'https://nominatim.openstreetmap.org/details.php?osmtype=W&osmid={}&addressdetails=1&polygon_geojson=1&format=json'
+url_template = 'https://nominatim.openstreetmap.org/details.php?osmtype={}&osmid={}&addressdetails=1&polygon_geojson=1&format=json'
 
 
 class Node:
@@ -80,30 +80,51 @@ def parse_osm_way(way_ids, folder, filename):
 
 
 def query_for_data(osm_id):
-    url = url_for_way.format(osm_id)
-    # print("URL to query: {}".format(url))
-
-    r = requests.get(url)
-    success = True
-    if r.status_code == 200:
-        try:
-            result = r.json()
-        except Exception as e:
-            raise e
-
-    elif r.status_code == 404:
-        success = False
-        result = r.content.decode("utf-8")
-    # We hit the limitation of 2048 characters for a GET request - stop here
-    elif r.status_code == 414:
-        success = False
-        result = r.content.decode("utf-8")
+    osm_type = osm_id[0].lower()
+    if osm_type == 'w':
+        osm_id = int(osm_id[1:])
+        urls_to_try = [url_template.format('W', osm_id)]
+    elif osm_type == 'r':
+        osm_id = int(osm_id[1:])
+        urls_to_try = [url_template.format('R', osm_id)]
+    elif osm_type == 'n':
+        osm_id = int(osm_id[1:])
+        urls_to_try = [url_template.format('N', osm_id)]
     else:
-        success = False
-        result = r.content.decode("utf-8")
-        raise Exception("Error found: " + r.content.decode("utf-8"))
+        osm_type = 'X'
+        osm_id = int(osm_id)
+        urls_to_try = [url_template.format('W', osm_id), url_template.format('R', osm_id), url_template.format('N', osm_id)]
 
-    return success, result, r.status_code
+    success = False
+    result = None
+    status_code = 'XXX'
+
+    url_ind = 0
+    while not success and url_ind < len(urls_to_try):
+        url = urls_to_try[url_ind]
+        url_ind += 1
+        r = requests.get(url)
+        status_code = r.status_code
+
+        if status_code == 200:
+            try:
+                result = r.json()
+                success = True
+            except Exception as e:
+                raise e
+
+        elif status_code == 404:
+            success = False
+            result = r.content.decode("utf-8")
+        # We hit the limitation of 2048 characters for a GET request - stop here
+        elif status_code == 414:
+            success = False
+            result = r.content.decode("utf-8")
+        else:
+            success = False
+            result = r.content.decode("utf-8")
+
+    return success, result, status_code, osm_type
 
 
 class Command(BaseCommand):
@@ -112,7 +133,7 @@ class Command(BaseCommand):
         parser.add_argument('--folder', action='store', dest='folder', required=True, type=str)
 
     def handle(self, *args, **options):
-        ids = list(map(int, options['ids'].split(',')))
+        ids = options['ids'].split(',')
         folder = options['folder']
         results_dir = os.path.join(folder, 'osm_query_results')
         results_dir_error = os.path.join(results_dir, 'errors')
@@ -120,13 +141,13 @@ class Command(BaseCommand):
         pathlib.Path(results_dir_error).mkdir(parents=True, exist_ok=True)
 
         bar = Bar('Querying from OSM', max=len(ids))
-        for way_id in ids:
-            file_name = os.path.join(results_dir, '{}.json'.format(way_id))
-            file_name_error_indicator = os.path.join(results_dir_error,  '{}'.format(way_id))
+        for osm_id in ids:
+            file_name = os.path.join(results_dir, '{}.json'.format(osm_id))
+            file_name_error_indicator = os.path.join(results_dir_error,  '{}'.format(osm_id))
             if os.path.isfile(file_name) or os.path.isfile(file_name_error_indicator):
                 bar.next()
                 continue
-            success, result, status_code = query_for_data(way_id)
+            success, result, status_code, osm_type = query_for_data(osm_id)
             if success:
                 with open(file_name, 'w') as f:
                     json.dump(result, f, indent=2, sort_keys=True)
@@ -134,7 +155,7 @@ class Command(BaseCommand):
                 results_dir_status_code = os.path.join(results_dir, str(status_code))
                 pathlib.Path(results_dir_status_code).mkdir(parents=True, exist_ok=True)
 
-                file_name_error = os.path.join(results_dir_status_code, '{}.json'.format(way_id))
+                file_name_error = os.path.join(results_dir_status_code, '{}.json'.format(osm_id))
                 with open(file_name_error, 'w') as f:
                     f.write(result)
                 with open(file_name_error_indicator, 'w') as f:

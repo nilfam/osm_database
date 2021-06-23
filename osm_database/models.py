@@ -87,7 +87,7 @@ class MultiPolygon(models.Model):
 
 
 class OsmEntity(models.Model):
-    osm_id = models.BigIntegerField(null=False, blank=False, unique=True, primary_key=True)
+    osm_id = models.BigIntegerField(null=False, blank=False, unique=False, primary_key=True)
     osm_type = models.CharField(max_length=255)
     type = models.CharField(max_length=255)
     category = models.CharField(max_length=255)
@@ -102,6 +102,9 @@ class OsmEntity(models.Model):
     right = models.FloatField(null=True, blank=True)
     top = models.FloatField(null=True, blank=True)
     geojson = models.ForeignKey(GeoJSON, null=False, blank=False, on_delete=models.CASCADE)
+
+    class Meta:
+        unique_together = ('osm_type', 'osm_id')
 
     def __str__(self):
         return "ID: {} Type: {} Category: {} name={}"\

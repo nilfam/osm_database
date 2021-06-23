@@ -10,14 +10,12 @@ import shapely.wkt
 from django.core.management import BaseCommand
 from geopy.distance import geodesic
 from progress.bar import Bar
-from shapely.geometry import Point, Polygon
+from shapely.geometry import Point
 from shapely.ops import nearest_points
 
 from osm_database.management.commands.calculate_nearest_points import fix_wkt_str_if_necessary
 from osm_database.management.commands.util import extract_points_for_polygons, extract_points_for_point
-from osm_database.models import GeoJSON, OsmEntity
-from osm_database.models import Point as _Point
-from osm_database.models import Polygon as _Polygon
+from osm_database.models import OsmEntity
 
 pattern = re.compile(r'([\d\-.]+ [\d\-.]+)', re.I | re.U)
 
@@ -31,24 +29,30 @@ cache = {}
 
 
 class ExcelRow:
-    def get_geoinfo_for_name(self, name):
-
+    def get_geoinfo_for_name(self, name, osm_id=None, osm_type=None):
         if name in cache:
             return cache[name]
 
-        osm_entities = OsmEntity.objects.filter(display_name=name)
+        if osm_id is not None and osm_id != '':
+            if osm_type is not None and osm_type != '':
+                osm_entities = OsmEntity.objects.filter(osm_id=int(osm_id), osm_type=osm_type.upper())
+            else:
+                osm_entities = OsmEntity.objects.filter(osm_id=int(osm_id))
+        else:
+            osm_entities = OsmEntity.objects.filter(display_name=name)
 
-        if osm_entities.count() == 0:
-            warning('No osm entity found for {}, use existing info from Excel'.format(name))
-            cache[name] = (None, None)
-            return None, None
+            if osm_entities.count() == 0:
+                warning('No osm entity found for {}, use existing info from Excel'.format(name))
+                return None, None, None, None
 
-        if osm_entities.count() > 1:
-            warning('More than one OSM entity found for {}, use existing info from Excel'.format(name))
-            cache[name] = (None, None)
-            return None, None
+            elif osm_entities.count() > 1:
+                warning('More than one OSM entity found for {}, use existing info from Excel'.format(name))
+                return None, None, None, None
 
         osm_entity = osm_entities.first()
+        osm_id = osm_entity.osm_id
+        osm_type = osm_entity.osm_type
+
         # get centroi lat lon, geojson
         lat = osm_entity.lat
         lon = osm_entity.lon
@@ -68,13 +72,16 @@ class ExcelRow:
             # point = _Point.objects.filter(geojson=osm_entity.geojson)
             geojson_to_point_id, point_ids_to_geopoints = extract_points_for_point(osm_entities)
             points = point_ids_to_geopoints[geojson_to_point_id[osm_entity.geojson.id]]
-            wkt_points = [x[::-1] for x in points]
-            wkt = 'POINT(' + ','.join(['{}'.format(x) for x in wkt_points[0]]) + ')'
+            if name != 'Albert Gate':
+                wkt_points = [x[::-1] for x in points]
+                wkt = 'POINT(' + ','.join(['{}'.format(x) for x in wkt_points[0]]) + ')'
+            else:
+                wkt = 'POINT({} {})'.format(points[0], points[1])
         else:
             wkt = None
 
-        cache[name] = (centroid, wkt)
-        return centroid, wkt
+        cache[name] = (osm_id, osm_type, centroid, wkt)
+        return osm_id, osm_type, centroid, wkt
 
     def __init__(self, row):
         self.location = row['Locatum']
@@ -87,11 +94,16 @@ class ExcelRow:
         lon_rel = row['Lon (Rel)']
 
         self.centroid_rel = Point(lat_rel, lon_rel)
-        self.boundary_loc_str = row['Points (LOC)']
-        self.boundary_rel_str = row['points (Rel)']
+        self.boundary_loc_str = row['Points (Loc)']
+        self.boundary_rel_str = row['Points (Rel)']
+
+        loc_id = row['Loc Id']
+        rel_id = row['Rel Id']
+        loc_osm_type = row['Loc OSMType']
+        rel_osm_type = row['Rel OSMType']
 
         # query for the actual boundary and centroid from the database
-        db_loc_centroid, db_loc_wkt = self.get_geoinfo_for_name(self.location)
+        self.loc_id, self.loc_osm_type, db_loc_centroid, db_loc_wkt = self.get_geoinfo_for_name(self.location, loc_id, loc_osm_type)
 
         if db_loc_centroid is None:
             self.centroid_loc = Point(lat_loc, lon_loc)
@@ -103,10 +115,10 @@ class ExcelRow:
             if self.boundary_loc_str.startswith('POINT'):
                 self.boundary_loc_str = self.boundary_loc_str.replace(',', ' ')
         else:
-            self.boundary_loc_str = db_loc_wkt
+            self.boundary_loc_str = fix_wkt_str_if_necessary(db_loc_wkt)
         self.boundary_loc = shapely.wkt.loads(self.boundary_loc_str)
 
-        db_rel_centroid, db_rel_wkt = self.get_geoinfo_for_name(self.relatum)
+        self.rel_id, self.rel_osm_type, db_rel_centroid, db_rel_wkt = self.get_geoinfo_for_name(self.relatum, rel_id, rel_osm_type)
         if db_rel_centroid is None:
             self.centroid_rel = Point(lat_rel, lon_rel)
         else:
@@ -117,11 +129,11 @@ class ExcelRow:
             if self.boundary_rel_str.startswith('POINT'):
                 self.boundary_rel_str = self.boundary_rel_str.replace(',', ' ')
         else:
-            self.boundary_rel_str = db_rel_wkt
+            self.boundary_rel_str = fix_wkt_str_if_necessary(db_rel_wkt)
 
         self.boundary_rel = shapely.wkt.loads(self.boundary_rel_str)
         
-        self.distance = row['Distance']
+        self.distance = row['Distance (original)']
         self.type = row['Type']
         self.category = row['Category']
         self.geojson_type= row['GeoJSON Type']
@@ -140,6 +152,17 @@ class Command(BaseCommand):
 
     def add_arguments(self, parser):
         parser.add_argument('--file', action='store', dest='file', required=True, type=str)
+
+    def populate_cache_from_excel(self, file):
+        xl = pd.ExcelFile(file)
+        self.sheets = {}
+
+        for sheet_name in xl.sheet_names:
+            df = xl.parse(sheet_name, keep_default_na=False)
+            df = df.fillna('')
+
+            for row_num, row in df.iterrows():
+                ExcelRow(row)
 
     def populate_objects_from_excel(self, file):
         xl = pd.ExcelFile(file)
@@ -195,7 +218,7 @@ class Command(BaseCommand):
                 r.distance_c2c = geodesic((x1, y1), (x2, y2)).meters
 
     def export_excel(self, export_file_path):
-        headers = ['Locatum', 'Preposition', 'Relatum', 'Fre', 
+        headers = ['Locatum', 'Preposition', 'Relatum', 'Loc OSMType', 'Loc Id', 'Rel OSMType', 'Rel Id',  'Fre',
                    'Lat (Loc)', 'Lon (loc)', 'Points (Loc)', 
                    'Type', 'Category', 'GeoJSON Type', 
                    'Lat (Rel)', 'Lon (Rel)', 'Points (Rel)', 
@@ -214,7 +237,7 @@ class Command(BaseCommand):
 
             for r in excel_rows:
                 row = [
-                    r.location, r.preposition, r.relatum, r.frequency,
+                    r.location, r.preposition, r.relatum, r.loc_osm_type, r.loc_id, r.rel_osm_type, r.rel_id, r.frequency,
 
                     r.centroid_loc.x, r.centroid_loc.y, r.boundary_loc_str,
 
@@ -247,14 +270,18 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         file = options['file']
 
+        print('Populate the cache first')
         try:
-            self.populate_objects_from_excel(file)
+            self.populate_cache_from_excel(file)
         except:
             traceback.print_exc()
         finally:
-            with open('sheets_corrected.pkl', 'wb') as f:
+            with open('cache.pkl', 'wb') as f:
                 pickle.dump(self.sheets, f)
 
+        print('Now correct Excel file')
+
+        self.populate_objects_from_excel(file)
         self.calculate_loc_boundary_to_ref_boundary()
         self.calculate_loc_centroid_to_ref_boundary()
         self.calculate_loc_centroid_to_ref_centroid()
@@ -262,11 +289,7 @@ class Command(BaseCommand):
         file_name = os.path.splitext(os.path.split(file)[1])[0]
         xlsx_dir = os.path.join(cache_dir, 'xlsx')
         pathlib.Path(xlsx_dir).mkdir(parents=True, exist_ok=True)
-        export_file_name = '{}-calculated.xlsx'.format(file_name)
+        export_file_name = '{}-corrected-calculated.xlsx'.format(file_name)
         export_file_path = os.path.join(xlsx_dir, export_file_name)
 
         self.export_excel(export_file_path)
-
-        print(self.sheets)
-
-        x = 0

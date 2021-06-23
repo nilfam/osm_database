@@ -44,11 +44,15 @@ class Command(BaseCommand):
 
         entity_obj = OsmEntity()
         entity_obj.osm_id = entity.get('osm_id', None)
+        entity_obj.osm_type = entity.get('osm_type', None)
         if entity_obj.osm_id is None:
             warning("No osm_id found in {}".format(filename))
             return
 
-        if entity_obj.osm_id in existing_osm_ids:
+        entity_unique_identifier = '{}{}'.format(entity_obj.osm_type, entity_obj.osm_id)
+
+        if entity_unique_identifier in existing_osm_ids:
+            warning("OSM entity {} already exists".format(entity_unique_identifier))
             return
 
         centroid = entity['centroid']
@@ -91,6 +95,7 @@ class Command(BaseCommand):
             exterior_positions = entity['geometry']['coordinates'][0]
             exterior_ring = LinearRing()
             exterior_ring.geojson = geojson
+            interior_rings = []
 
             if commit:
                 exterior_ring.save()
@@ -105,9 +110,11 @@ class Command(BaseCommand):
                 ring.geojson = geojson
                 if commit:
                     ring.save()
-                polygon.interior_rings.add(ring)
+                interior_rings.append(ring)
                 self.create_positions(interior_ring, LinearRing, 'linearring_id', ring, commit)
             if commit:
+                for ring in interior_rings:
+                    polygon.interior_rings.add(ring)
                 polygon.save()
 
         elif geojson.type == 'LineString':
@@ -189,7 +196,7 @@ class Command(BaseCommand):
         if commit:
             try:
                 entity_obj.save()
-                existing_osm_ids.add(entity_obj.osm_id)
+                existing_osm_ids.add('{}{}'.format(entity_obj.osm_type, entity_obj.osm_id))
             except IntegrityError as e:
                 traceback.print_exc()
                 warning("Entity {} from {} already exist".format(entity_obj.osm_id, filename))
@@ -213,7 +220,7 @@ class Command(BaseCommand):
         else:
             processed = set()
 
-        existing_osm_ids = set(OsmEntity.objects.values_list('osm_id', flat=True))
+        existing_osm_ids = set(['{}{}'.format(x[0], x[1]) for x in OsmEntity.objects.values_list('osm_type', 'osm_id')])
         files_to_process = []
 
         for file in os.listdir(folder):
