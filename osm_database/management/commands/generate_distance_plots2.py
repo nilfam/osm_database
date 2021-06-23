@@ -5,7 +5,9 @@ import re
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+import shapely.wkt
 from django.core.management import BaseCommand
+from shapely.geometry import Point
 
 pattern = re.compile(r'([\d\-.]+ [\d\-.]+)', re.I | re.U)
 
@@ -68,6 +70,13 @@ class Database:
         return categories_details
 
 
+full_labels = {
+    'Fre': 'Frequency',
+    'Distance (c2b)': 'Distance from locatum centroid to relatum boundary',
+    'Distance (b2b)': 'Distance from locatum boundary to relatum boundary',
+}
+
+
 class Command(BaseCommand):
     def __init__(self):
         super().__init__()
@@ -83,7 +92,17 @@ class Command(BaseCommand):
             for row_num, row in df.iterrows():
                 self.database.add_row(row, for_rels)
 
-    def plot(self, categories_details, datapoint_column_name, value_column_name, img_dir, image_name_prefix, use_scatter=False):
+    def plot(self, categories_details, datapoint_column_name, value_column_name, img_dir, image_name_prefix, type='gigigi'):
+        image_name_prefix += '_' + type
+        if type == 'gigigi':
+            self._plot_gigigi(categories_details, datapoint_column_name, value_column_name, img_dir, image_name_prefix)
+        elif type == 'normal':
+            self._plot_scatter(categories_details, datapoint_column_name, value_column_name, img_dir, image_name_prefix, yaxis_is_frequency=True)
+        else:
+            self._plot_scatter(categories_details, datapoint_column_name, value_column_name, img_dir, image_name_prefix,
+                               yaxis_is_frequency=False)
+
+    def _plot_gigigi(self, categories_details, datapoint_column_name, value_column_name, img_dir, image_name_prefix):
         for category_details in categories_details:
             category = category_details['category']
 
@@ -93,14 +112,14 @@ class Command(BaseCommand):
             subcategories = category_details['subcategories']
 
 
-            fg = plt.figure(figsize=(15, 10))
-            plt.xticks(rotation=90, ha='right')
-            plt.subplots_adjust(bottom=0.4, top=0.99)
+            fg = plt.figure(figsize=(10, 7))
+            # plt.xticks(rotation=90, ha='right')
+            # plt.subplots_adjust(bottom=0.4, top=0.99)
 
             import itertools
             marker = itertools.cycle(("$f$", 'o', r"$\mathcal{A}$","$1$", 's',5, 'h', 1))
 
-            colours = itertools.cycle(('navy', 'crimson', 'yellow', 'darkgreen', 'black', 'orange', 'lightcoral', 'purple', 'brown', 1))
+            colours = itertools.cycle(('lightsteelblue', 'crimson', 'yellow', 'b', 'black', 'orange', 'lightcoral', 'lime', 'brown', 1))
 
             for ind, subcategory_data in enumerate(subcategories, 1):
                 subcategory = subcategory_data['subcategory']
@@ -108,24 +127,74 @@ class Command(BaseCommand):
                 x_data = np.array(df[datapoint_column_name]).astype(np.float)
                 y_data = np.array(df[value_column_name]).astype(np.float)
 
-                if use_scatter:
-                    # y_data = np.empty(y_data.shape)
-                    s = np.log10(y_data) * 300
-                    y_data.fill(ind)
-                    plt.scatter(x=x_data, y=y_data, s=s, c=next(colours), label=subcategory, alpha=0.5, edgecolor='black', linewidth=1)
-                else:
-                    x_sort_order = np.argsort(x_data)
-                    x_data = x_data[x_sort_order]
-                    y_data = y_data[x_sort_order]
-                    plt.plot(x_data, y_data, label=subcategory, marker=True)
+                x_sort_order = np.argsort(x_data)
+                x_data = x_data[x_sort_order]
+                y_data = y_data[x_sort_order]
+                plt.plot(x_data, y_data, label=subcategory, marker='o')
 
             legend = plt.legend(fontsize=10)
 
-            if use_scatter:
-                for legend_handler in legend.legendHandles:
-                    legend_handler._sizes = [200]
-            plt.xlabel(datapoint_column_name)
-            plt.ylabel(value_column_name)
+            plt.xlabel(full_labels.get(datapoint_column_name, datapoint_column_name))
+            plt.ylabel(full_labels.get(value_column_name, value_column_name))
+
+            plt.title(file_name.replace('_', ' '),
+                      fontdict={'family': 'serif',
+                                'color': 'darkblue',
+                                'weight': 'bold',
+                                'size': 18})
+
+            plt.savefig(file_path)
+            plt.close()
+
+    def _plot_scatter(self, categories_details, datapoint_column_name, value_column_name, img_dir, image_name_prefix, yaxis_is_frequency=True):
+        for category_details in categories_details:
+            category = category_details['category']
+
+            file_name = image_name_prefix + '-' + category.replace(' ', '_')
+            file_path = os.path.join(img_dir, file_name)
+
+            subcategories = category_details['subcategories']
+
+
+            fg = plt.figure(figsize=(10, 7))
+            # plt.xticks(rotation=90, ha='right')
+            # plt.subplots_adjust(bottom=0.4, top=0.99)
+
+            import itertools
+            marker = itertools.cycle(("$f$", 'o', r"$\mathcal{A}$","$1$", 's',5, 'h', 1))
+
+            colours = itertools.cycle(('lightsteelblue', 'crimson', 'yellow', 'b', 'black', 'orange', 'lightcoral', 'lime', 'brown', 1))
+
+            for ind, subcategory_data in enumerate(subcategories, 1):
+                subcategory = subcategory_data['subcategory']
+                df = subcategory_data['df']
+                x_data = np.array(df[datapoint_column_name]).astype(np.float)
+                y_data = np.array(df[value_column_name]).astype(np.float)
+
+                s = np.log2(y_data + 1).astype(np.float) * 70
+
+                if not yaxis_is_frequency:
+                    y_data.fill(ind)
+                plt.scatter(x=x_data, y=y_data, s=s, c=next(colours), label=subcategory, alpha=0.5, edgecolor='black', linewidth=1)
+
+            legend = plt.legend(fontsize=10)
+
+            for legend_handler in legend.legendHandles:
+                legend_handler._sizes = [200]
+            plt.xlabel(full_labels.get(datapoint_column_name, datapoint_column_name))
+
+            if not yaxis_is_frequency:
+                y_label = 'Preposition'
+            else:
+                y_label = full_labels.get(value_column_name, value_column_name)
+
+            plt.ylabel(y_label)
+
+            plt.title(file_name.replace('_', ' '),
+                      fontdict={'family': 'serif',
+                                'color': 'darkblue',
+                                'weight': 'bold',
+                                'size': 18})
 
             plt.savefig(file_path)
             plt.close()
@@ -144,10 +213,12 @@ class Command(BaseCommand):
         self.database.finalise()
 
         categories_details = self.database.get_categories_details('Preposition', 'Relatum', 'Distance (b2b)', 'Fre')
-        self.plot(categories_details, 'Distance (b2b)','Fre', img_dir, 'data_for_plotting1-b2b')
+        self.plot(categories_details, 'Distance (b2b)', 'Fre', img_dir, 'data_for_plotting1-b2b', 'gigigi')
+        self.plot(categories_details, 'Distance (b2b)', 'Fre', img_dir, 'data_for_plotting1-b2b', 'gigili')
 
         categories_details = self.database.get_categories_details('Preposition', 'Relatum', 'Distance (c2b)', 'Fre')
-        self.plot(categories_details,'Distance (c2b)','Fre', img_dir, 'data_for_plotting1-c2b')
+        self.plot(categories_details,'Distance (c2b)', 'Fre', img_dir, 'data_for_plotting1-c2b', 'gigigi')
+        self.plot(categories_details,'Distance (c2b)', 'Fre', img_dir, 'data_for_plotting1-c2b', 'gigili')
 
         # # Part 2
         # file = 'files/xlsx/data_for_plotting2.xlsx'
@@ -160,7 +231,9 @@ class Command(BaseCommand):
         # self.database.finalise()
 
         categories_details = self.database.get_categories_details('Relatum', 'Preposition', 'Distance (b2b)', 'Fre')
-        self.plot(categories_details, 'Distance (b2b)', 'Fre', img_dir, 'data_for_plotting2-b2b', True)
+        self.plot(categories_details, 'Distance (b2b)', 'Fre', img_dir, 'data_for_plotting2-b2b', 'normal')
+        self.plot(categories_details, 'Distance (b2b)', 'Fre', img_dir, 'data_for_plotting2-b2b', 'gigili')
 
         categories_details = self.database.get_categories_details('Relatum', 'Preposition', 'Distance (c2b)','Fre')
-        self.plot(categories_details, 'Distance (c2b)', 'Fre', img_dir, 'data_for_plotting2-c2b', True)
+        self.plot(categories_details, 'Distance (c2b)', 'Fre', img_dir, 'data_for_plotting2-c2b', 'gigili')
+        self.plot(categories_details, 'Distance (c2b)', 'Fre', img_dir, 'data_for_plotting2-c2b', 'normal')
