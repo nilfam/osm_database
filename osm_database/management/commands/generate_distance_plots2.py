@@ -5,9 +5,8 @@ import re
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-import shapely.wkt
 from django.core.management import BaseCommand
-from shapely.geometry import Point
+from scipy.interpolate import interp1d
 
 pattern = re.compile(r'([\d\-.]+ [\d\-.]+)', re.I | re.U)
 
@@ -15,6 +14,12 @@ current_dir = os.path.dirname(os.path.abspath(__file__))
 script_name = os.path.split(__file__)[1][0:-3]
 dir_parts = current_dir.split(os.path.sep)
 cache_dir = os.path.join(os.path.sep.join(dir_parts[0:dir_parts.index('management')]), 'cache', script_name)
+
+
+def normalise(arr, minval, maxval):
+    arr_min = arr.min()
+    arr_max = arr.max()
+    return (arr - arr_min) / (arr_max) * (maxval - minval) + minval
 
 
 class Database:
@@ -94,15 +99,147 @@ class Command(BaseCommand):
 
     def plot(self, categories_details, datapoint_column_name, value_column_name, img_dir, image_name_prefix, type='gigigi'):
         image_name_prefix += '_' + type
-        if type == 'gigigi':
-            self._plot_gigigi(categories_details, datapoint_column_name, value_column_name, img_dir, image_name_prefix)
+        if type.startswith('gigigi'):
+            accum = type.endswith('-accum')
+            self._plot_gigigi(categories_details, datapoint_column_name, value_column_name, img_dir, image_name_prefix, accum)
+        elif type.startswith('stacked'):
+            trim = type.endswith('-trim')
+            self._plot_interpolated(categories_details, datapoint_column_name, value_column_name, img_dir, image_name_prefix, trim)
         elif type == 'normal':
             self._plot_scatter(categories_details, datapoint_column_name, value_column_name, img_dir, image_name_prefix, yaxis_is_frequency=True)
         else:
             self._plot_scatter(categories_details, datapoint_column_name, value_column_name, img_dir, image_name_prefix,
                                yaxis_is_frequency=False)
 
-    def _plot_gigigi(self, categories_details, datapoint_column_name, value_column_name, img_dir, image_name_prefix):
+    def _plot_interpolated(selfself, categories_details, datapoint_column_name, value_column_name, img_dir, image_name_prefix, trim):
+        for category_details in categories_details:
+            category = category_details['category']
+
+            file_name = image_name_prefix + '-' + category.replace(' ', '_')
+            file_path = os.path.join(img_dir, file_name)
+
+            subcategories = category_details['subcategories']
+
+            plt.figure(figsize=(10, 7))
+
+            import itertools
+            marker = itertools.cycle(("$f$", 'o', r"$\mathcal{A}$","$1$", 's',5, 'h', 1))
+
+            colours = itertools.cycle(('blue', 'pink', 'yellow', 'orange', 'black', 'gray', 'purple', 'lime', 'brown', 1))
+
+            # Interpolate data here
+            all_x_data = np.array([])
+            subcategory_first_xs = []
+
+            for ind, subcategory_data in enumerate(subcategories, 1):
+                df = subcategory_data['df']
+                x_data = np.array(df[datapoint_column_name]).astype(np.float)
+                all_x_data = np.concatenate((all_x_data, x_data))
+                x_data_min = np.min(x_data)
+                subcategory_first_xs.append(x_data_min)
+
+            all_x_data.sort()
+            all_x_data = np.unique(all_x_data)
+
+            subcategory_order_by_min_x = np.argsort(subcategory_first_xs)
+            y_data_interpolated_accum = np.zeros(all_x_data.shape)
+
+            for ind in subcategory_order_by_min_x:
+                subcategory_data = subcategories[ind]
+
+            # for ind, subcategory_data in enumerate(subcategories, 1):
+                subcategory = subcategory_data['subcategory']
+                df = subcategory_data['df']
+                x_data = np.array(df[datapoint_column_name]).astype(np.float)
+                y_data = np.array(df[value_column_name]).astype(np.float)
+
+                # We need to sort - along x-axis first and then y-axis, this is because there values of x_data
+                # might not be all unique
+                sort_order = np.lexsort((y_data, x_data))
+                x_data = x_data[sort_order]
+                y_data = y_data[sort_order]
+
+                # First accumulate frequency data
+                y_data_accum = np.add.accumulate(y_data)
+
+                # Now linear interpolate. In case there's only one data point, the interpolation
+                # will simply be filled with that one value
+                if len(x_data) == 1:
+                    blah = 0
+                    y_data_interpolated = np.zeros(all_x_data.shape)
+                    y_data_interpolated[np.where(all_x_data == x_data[0])] = y_data_accum[0]
+                    y_data_interpolated = np.add.accumulate(y_data_interpolated)
+                else:
+                    y_interp = interp1d(x_data, y_data_accum, fill_value="extrapolate")
+                    y_data_interpolated = y_interp(all_x_data)
+                    nan_inds = np.where(np.isnan(y_data_interpolated))
+
+                    # Data cannot be interpolated between two datapoints that have the same x values.
+                    # In this case we need to interpolate the point based on differential equation -
+                    # which for linear interpolation is simply to take the average of y values
+                    for ind in nan_inds:
+                        x = all_x_data[ind]
+                        replacement = np.mean(y_data[np.where(x_data == x)])
+                        y_data_interpolated[ind] = replacement
+
+                    # Extrapolation can produce negative value, so we simply set them to zero
+                    # marked for removal later. This might not be the best way
+                    y_data_interpolated[np.where(y_data_interpolated < 0)] = 0
+                    y_data_interpolated[np.where(np.isnan(y_data_interpolated))] = 0
+                    # y_data_interpolated[np.where(all_x_data < x_data[0])] = 0
+                    # y_data_interpolated[np.where(all_x_data > x_data[-1])] = 0
+
+                # This is for stacking the next line on top of the previous line
+                # e.g. value to plot is current value plus accumulative prior values
+                y_data_interpolated_accum = y_data_interpolated_accum + y_data_interpolated
+
+                if trim:
+                    # Remove the interpolated points prior to the beginning of the actual array,
+                    # and after the end of the actual array. We do this by marking these point zeros
+                    y_data_interpolated[np.where(all_x_data < x_data[0])] = 0
+                    y_data_interpolated[np.where(all_x_data > x_data[-1])] = 0
+
+                # Mark all the non-zero points to keep, all the rest will be removed
+                points_to_keep = np.where(y_data_interpolated > 0)
+
+                # Actual points to be plotted, after removing zero points
+                x_to_plot = all_x_data[points_to_keep]
+                y_to_plot = y_data_interpolated_accum[points_to_keep]
+
+                # We find out which points are interpolated, which one are real
+                # So that we can draw a circle around them with different colours
+                interpolated_indx = np.empty(x_to_plot.shape, dtype=np.bool)
+                interpolated_indx.fill(False)
+                for i, x in enumerate(x_to_plot):
+                    interpolated_indx[i] = len(np.where(x_data == x)[0]) == 0
+
+                real_point_indx = np.logical_not(interpolated_indx)
+
+                # First, plot the line
+                color = next(colours)
+                plt.plot(x_to_plot, y_to_plot, label=subcategory, marker='.', color=color, markersize=15)
+
+                # Then, plot the interpolated points on top with red border
+                plt.scatter(x=x_to_plot[interpolated_indx], y=y_to_plot[interpolated_indx], s=150, c='red')
+
+                # Finally, plot the real points with green border
+                plt.scatter(x=x_to_plot[real_point_indx], y=y_to_plot[real_point_indx], s=150, c='green')
+
+            plt.legend(fontsize=10)
+
+            plt.xlabel(full_labels.get(datapoint_column_name, datapoint_column_name))
+            plt.ylabel(full_labels.get(value_column_name, value_column_name))
+
+            plt.title(file_name.replace('_', ' '),
+                      fontdict={'family': 'serif',
+                                'color': 'darkblue',
+                                'weight': 'bold',
+                                'size': 18})
+
+            plt.savefig(file_path)
+            plt.close()
+
+    def _plot_gigigi(self, categories_details, datapoint_column_name, value_column_name, img_dir, image_name_prefix, accum=False):
         for category_details in categories_details:
             category = category_details['category']
 
@@ -130,6 +267,10 @@ class Command(BaseCommand):
                 x_sort_order = np.argsort(x_data)
                 x_data = x_data[x_sort_order]
                 y_data = y_data[x_sort_order]
+
+                if accum:
+                    y_data = np.add.accumulate(y_data)
+
                 plt.plot(x_data, y_data, label=subcategory, marker='o')
 
             legend = plt.legend(fontsize=10)
@@ -168,8 +309,8 @@ class Command(BaseCommand):
                 x_data = np.array(df[datapoint_column_name]).astype(np.float)
                 y_data = np.array(df[value_column_name]).astype(np.float)
 
-                s = np.log10(y_data + 1).astype(np.float) * 700
-
+                # s1 = np.log10(y_data + 1).astype(np.float) * 700
+                s = y_data * 20
                 if not yaxis_is_frequency:
                     y_data.fill(ind)
                 plt.scatter(x=x_data, y=y_data, s=s, c=next(colours), label=subcategory, alpha=0.5, edgecolor='black', linewidth=1)
@@ -216,26 +357,19 @@ class Command(BaseCommand):
 
         categories_details = self.database.get_categories_details('Preposition', 'Relatum', 'Distance (b2b)', 'Fre')
         self.plot(categories_details, 'Distance (b2b)', 'Fre', img_dir, 'data_for_plotting1-b2b', 'gigigi')
-        self.plot(categories_details, 'Distance (b2b)', 'Fre', img_dir, 'data_for_plotting1-b2b', 'gigili')
+        self.plot(categories_details, 'Distance (b2b)', 'Fre', img_dir, 'data_for_plotting1-b2b', 'gigigi-accum')
+        self.plot(categories_details, 'Distance (b2b)', 'Fre', img_dir, 'data_for_plotting1-b2b', 'stacked')
+        self.plot(categories_details, 'Distance (b2b)', 'Fre', img_dir, 'data_for_plotting1-b2b', 'stacked-trim')
+        # self.plot(categories_details, 'Distance (b2b)', 'Fre', img_dir, 'data_for_plotting1-b2b', 'gigili')
 
         categories_details = self.database.get_categories_details('Preposition', 'Relatum', 'Distance (c2b)', 'Fre')
-        self.plot(categories_details,'Distance (c2b)', 'Fre', img_dir, 'data_for_plotting1-c2b', 'gigigi')
-        self.plot(categories_details,'Distance (c2b)', 'Fre', img_dir, 'data_for_plotting1-c2b', 'gigili')
-
-        # # Part 2
-        # file = 'files/xlsx/data_for_plotting2.xlsx'
-        # file_name = os.path.splitext(os.path.split(file)[1])[0]
-        # img_dir = os.path.join(cache_dir, 'png')
-        # pathlib.Path(img_dir).mkdir(parents=True, exist_ok=True)
-        # image_name_prefix = file_name + '-'
-
-        # self.populate_objects_from_excel(file)
-        # self.database.finalise()
+        # self.plot(categories_details,'Distance (c2b)', 'Fre', img_dir, 'data_for_plotting1-c2b', 'gigigi')
+        # self.plot(categories_details,'Distance (c2b)', 'Fre', img_dir, 'data_for_plotting1-c2b', 'gigili')
 
         categories_details = self.database.get_categories_details('Relatum', 'Preposition', 'Distance (b2b)', 'Fre')
-        self.plot(categories_details, 'Distance (b2b)', 'Fre', img_dir, 'data_for_plotting2-b2b', 'normal')
-        self.plot(categories_details, 'Distance (b2b)', 'Fre', img_dir, 'data_for_plotting2-b2b', 'gigili')
+        # self.plot(categories_details, 'Distance (b2b)', 'Fre', img_dir, 'data_for_plotting2-b2b', 'normal')
+        # self.plot(categories_details, 'Distance (b2b)', 'Fre', img_dir, 'data_for_plotting2-b2b', 'gigigi')
 
         categories_details = self.database.get_categories_details('Relatum', 'Preposition', 'Distance (c2b)','Fre')
-        self.plot(categories_details, 'Distance (c2b)', 'Fre', img_dir, 'data_for_plotting2-c2b', 'gigili')
-        self.plot(categories_details, 'Distance (c2b)', 'Fre', img_dir, 'data_for_plotting2-c2b', 'normal')
+        # self.plot(categories_details, 'Distance (c2b)', 'Fre', img_dir, 'data_for_plotting2-c2b', 'gigigi')
+        # self.plot(categories_details, 'Distance (c2b)', 'Fre', img_dir, 'data_for_plotting2-c2b', 'normal')
