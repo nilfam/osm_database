@@ -105,11 +105,14 @@ class Command(BaseCommand):
         elif type.startswith('stacked'):
             trim = type.endswith('-trim')
             self._plot_interpolated(categories_details, datapoint_column_name, value_column_name, img_dir, image_name_prefix, trim)
-        elif type == 'normal':
-            self._plot_scatter(categories_details, datapoint_column_name, value_column_name, img_dir, image_name_prefix, yaxis_is_frequency=True)
-        else:
+        elif type.startswith('normal'):
+            same_size = type.endswith('-samesize')
             self._plot_scatter(categories_details, datapoint_column_name, value_column_name, img_dir, image_name_prefix,
-                               yaxis_is_frequency=False)
+                               same_size, yaxis_is_frequency=True)
+        else:
+            same_size = False
+            self._plot_scatter(categories_details, datapoint_column_name, value_column_name, img_dir, image_name_prefix,
+                               same_size, yaxis_is_frequency=False)
 
     def _plot_interpolated(selfself, categories_details, datapoint_column_name, value_column_name, img_dir, image_name_prefix, trim):
         for category_details in categories_details:
@@ -287,7 +290,8 @@ class Command(BaseCommand):
             plt.savefig(file_path)
             plt.close()
 
-    def _plot_scatter(self, categories_details, datapoint_column_name, value_column_name, img_dir, image_name_prefix, yaxis_is_frequency=True):
+    def _plot_scatter(self, categories_details, datapoint_column_name, value_column_name, img_dir, image_name_prefix,
+                      same_size, yaxis_is_frequency=True):
         for category_details in categories_details:
             category = category_details['category']
 
@@ -309,8 +313,10 @@ class Command(BaseCommand):
                 x_data = np.array(df[datapoint_column_name]).astype(np.float)
                 y_data = np.array(df[value_column_name]).astype(np.float)
 
-                # s1 = np.log10(y_data + 1).astype(np.float) * 700
-                s = y_data * 20
+                if same_size:
+                    s = 20
+                else:
+                    s = y_data * 20
                 if not yaxis_is_frequency:
                     y_data.fill(ind)
                 plt.scatter(x=x_data, y=y_data, s=s, c=next(colours), label=subcategory, alpha=0.5, edgecolor='black', linewidth=1)
@@ -356,20 +362,23 @@ class Command(BaseCommand):
         self.database.finalise()
 
         categories_details = self.database.get_categories_details('Preposition', 'Relatum', 'Distance (b2b)', 'Fre')
-        self.plot(categories_details, 'Distance (b2b)', 'Fre', img_dir, 'data_for_plotting1-b2b', 'gigigi')
-        self.plot(categories_details, 'Distance (b2b)', 'Fre', img_dir, 'data_for_plotting1-b2b', 'gigigi-accum')
-        self.plot(categories_details, 'Distance (b2b)', 'Fre', img_dir, 'data_for_plotting1-b2b', 'stacked')
-        self.plot(categories_details, 'Distance (b2b)', 'Fre', img_dir, 'data_for_plotting1-b2b', 'stacked-trim')
+        # self.plot(categories_details, 'Distance (b2b)', 'Fre', img_dir, 'data_for_plotting1-b2b', 'gigigi')
+        # self.plot(categories_details, 'Distance (b2b)', 'Fre', img_dir, 'data_for_plotting1-b2b', 'gigigi-accum')
+        # self.plot(categories_details, 'Distance (b2b)', 'Fre', img_dir, 'data_for_plotting1-b2b', 'stacked')
+        # self.plot(categories_details, 'Distance (b2b)', 'Fre', img_dir, 'data_for_plotting1-b2b', 'stacked-trim')
         # self.plot(categories_details, 'Distance (b2b)', 'Fre', img_dir, 'data_for_plotting1-b2b', 'gigili')
+        self.plot(categories_details, 'Distance (b2b)', 'Fre', img_dir, 'data_for_plotting1-b2b', 'normal-samesize')
 
         categories_details = self.database.get_categories_details('Preposition', 'Relatum', 'Distance (c2b)', 'Fre')
         # self.plot(categories_details,'Distance (c2b)', 'Fre', img_dir, 'data_for_plotting1-c2b', 'gigigi')
         # self.plot(categories_details,'Distance (c2b)', 'Fre', img_dir, 'data_for_plotting1-c2b', 'gigili')
+        self.plot(categories_details,'Distance (c2b)', 'Fre', img_dir, 'data_for_plotting1-c2b', 'normal-samesize')
 
         categories_details = self.database.get_categories_details('Relatum', 'Preposition', 'Distance (b2b)', 'Fre')
-        # self.plot(categories_details, 'Distance (b2b)', 'Fre', img_dir, 'data_for_plotting2-b2b', 'normal')
-        # self.plot(categories_details, 'Distance (b2b)', 'Fre', img_dir, 'data_for_plotting2-b2b', 'gigigi')
+        # self.plot(categories_details, 'Distance (b2b)', 'Fre', img_dir, 'data_for_plotting2-b2b', 'normal-samesize')
+        # self.plot(categories_details, 'Distance (b2b)', 'Fre', img_dir, 'data_for_plotting2-b2b', 'gigigi-accum')
 
         categories_details = self.database.get_categories_details('Relatum', 'Preposition', 'Distance (c2b)','Fre')
         # self.plot(categories_details, 'Distance (c2b)', 'Fre', img_dir, 'data_for_plotting2-c2b', 'gigigi')
-        # self.plot(categories_details, 'Distance (c2b)', 'Fre', img_dir, 'data_for_plotting2-c2b', 'normal')
+        # self.plot(categories_details, 'Distance (c2b)', 'Fre', img_dir, 'data_for_plotting2-c2b', 'gigigi-accum')
+        # self.plot(categories_details, 'Distance (c2b)', 'Fre', img_dir, 'data_for_plotting2-c2b', 'normal-samesize')
