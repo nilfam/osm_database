@@ -302,31 +302,58 @@ class Command(BaseCommand):
             plt.figure(figsize=(10, 7))
 
             import itertools
-            colours = itertools.cycle(('lightsteelblue', 'crimson', 'yellow', 'b', 'black', 'orange', 'lightcoral', 'lime', 'brown', 1))
+            colours = itertools.cycle(('red', 'blue', 'black', 'orange', 'purple', 'brown'))
 
             subcategories_names = []
             subcategories_indx = []
+
+            x_data_min = None
+            x_data_max = None
+            for ind, subcategory_data in enumerate(subcategories, 1):
+                df = subcategory_data['df']
+                x_data = np.array(df[datapoint_column_name]).astype(np.float)
+                x_data_min = x_data.min() if x_data_min is None else min(x_data_min, x_data.min())
+                x_data_max = x_data.max() if x_data_max is None else max(x_data_max, x_data.max())
 
             for ind, subcategory_data in enumerate(subcategories, 1):
                 subcategory = subcategory_data['subcategory']
                 df = subcategory_data['df']
                 x_data = np.array(df[datapoint_column_name]).astype(np.float)
-                y_data = np.array(df[value_column_name]).astype(np.float)
+                raw_y_data = np.array(df[value_column_name]).astype(np.float)
+
+                sort_order = np.lexsort((raw_y_data, x_data))
+                x_data = x_data[sort_order]
+                raw_y_data = raw_y_data[sort_order]
+
+                y_data = np.array(raw_y_data, copy=True)
 
                 if same_size:
-                    s = 20
+                    s = 50
+                    alpha = 1
                 else:
                     s = y_data * 20
+                    alpha = 0.5
                 if not yaxis_is_frequency:
                     y_data.fill(ind)
-                plt.scatter(x=x_data, y=y_data, s=s, c=next(colours), label=subcategory, alpha=0.5, edgecolor='black', linewidth=1)
+
+                colour = next(colours)
+                plt.scatter(x=x_data, y=y_data, s=s, c=colour, label=subcategory, alpha=alpha, edgecolor='black', linewidth=1)
+
+                num_data_point = len(x_data)
+                order = min(3, num_data_point - 1)
+                if num_data_point > 1:
+                    poly1d = np.poly1d(np.polyfit(x_data, raw_y_data, order))
+                    poly_x = np.linspace(x_data_min, x_data_max, 300)
+                    poly_y = poly1d(poly_x)
+                    plt.plot(poly_x, poly_y, c=colour, linestyle='dashed')
+
                 subcategories_names.append(subcategory)
                 subcategories_indx.append(ind)
 
             if yaxis_is_frequency:
                 legend = plt.legend(fontsize=10)
                 for legend_handler in legend.legendHandles:
-                    legend_handler._sizes = [200]
+                    legend_handler._sizes = [50]
                 plt.xlabel(full_labels.get(datapoint_column_name, datapoint_column_name))
             else:
                 plt.yticks(subcategories_indx, labels=subcategories_names)
@@ -344,6 +371,8 @@ class Command(BaseCommand):
                                 'color': 'darkblue',
                                 'weight': 'bold',
                                 'size': 18})
+
+            plt.ylim((-5, plt.ylim()[1]))
 
             plt.savefig(file_path)
             plt.close()
@@ -375,10 +404,10 @@ class Command(BaseCommand):
         self.plot(categories_details,'Distance (c2b)', 'Fre', img_dir, 'data_for_plotting1-c2b', 'normal-samesize')
 
         categories_details = self.database.get_categories_details('Relatum', 'Preposition', 'Distance (b2b)', 'Fre')
-        # self.plot(categories_details, 'Distance (b2b)', 'Fre', img_dir, 'data_for_plotting2-b2b', 'normal-samesize')
+        self.plot(categories_details, 'Distance (b2b)', 'Fre', img_dir, 'data_for_plotting2-b2b', 'normal-samesize')
         # self.plot(categories_details, 'Distance (b2b)', 'Fre', img_dir, 'data_for_plotting2-b2b', 'gigigi-accum')
 
         categories_details = self.database.get_categories_details('Relatum', 'Preposition', 'Distance (c2b)','Fre')
         # self.plot(categories_details, 'Distance (c2b)', 'Fre', img_dir, 'data_for_plotting2-c2b', 'gigigi')
         # self.plot(categories_details, 'Distance (c2b)', 'Fre', img_dir, 'data_for_plotting2-c2b', 'gigigi-accum')
-        # self.plot(categories_details, 'Distance (c2b)', 'Fre', img_dir, 'data_for_plotting2-c2b', 'normal-samesize')
+        self.plot(categories_details, 'Distance (c2b)', 'Fre', img_dir, 'data_for_plotting2-c2b', 'normal-samesize')
