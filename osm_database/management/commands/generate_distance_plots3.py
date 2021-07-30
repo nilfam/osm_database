@@ -378,7 +378,7 @@ class Command(BaseCommand):
 
 
     def handle(self, *args, **options):
-        files = ['osm_database/cache/calculate_nearest_points_with_correction/xlsx/2New-relatum-points-corrected-calculatedNormalised.xlsx',
+        files = ['osm_database/cache/calculate_nearest_points_with_correction/xlsx/2New-relatum-points-corrected-calculatedNormalised-corrected-calculated.xlsx',
                  'osm_database/cache/calculate_nearest_points_with_correction/xlsx/ArcGis6Relata-corrected-calculatedNormalised.xlsx']
         img_dir = os.path.join(cache_dir, 'png')
         pathlib.Path(img_dir).mkdir(parents=True, exist_ok=True)

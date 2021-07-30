@@ -106,13 +106,15 @@ class Command(BaseCommand):
             trim = type.endswith('-trim')
             self._plot_interpolated(categories_details, datapoint_column_name, value_column_name, img_dir, image_name_prefix, trim)
         elif type.startswith('normal'):
-            same_size = type.endswith('-samesize')
+            same_size = type.find('-samesize') > -1
+            hyperbola = type.endswith('-hyperbola')
             self._plot_scatter(categories_details, datapoint_column_name, value_column_name, img_dir, image_name_prefix,
-                               same_size, yaxis_is_frequency=True)
+                               same_size, hyperbola, yaxis_is_frequency=True)
         else:
             same_size = False
+            hyperbola = False
             self._plot_scatter(categories_details, datapoint_column_name, value_column_name, img_dir, image_name_prefix,
-                               same_size, yaxis_is_frequency=False)
+                               same_size, hyperbola, yaxis_is_frequency=False)
 
     def _plot_interpolated(selfself, categories_details, datapoint_column_name, value_column_name, img_dir, image_name_prefix, trim):
         for category_details in categories_details:
@@ -291,7 +293,7 @@ class Command(BaseCommand):
             plt.close()
 
     def _plot_scatter(self, categories_details, datapoint_column_name, value_column_name, img_dir, image_name_prefix,
-                      same_size, yaxis_is_frequency=True):
+                      same_size, hyperbola, yaxis_is_frequency=True):
         for category_details in categories_details:
             category = category_details['category']
 
@@ -302,18 +304,22 @@ class Command(BaseCommand):
             plt.figure(figsize=(10, 7))
 
             import itertools
-            colours = itertools.cycle(('red', 'blue', 'black', 'orange', 'purple', 'brown'))
+            colours = itertools.cycle(('red', 'blue', 'orange', 'black', 'purple', 'brown'))
 
             subcategories_names = []
             subcategories_indx = []
 
             x_data_min = None
             x_data_max = None
+            y_data_max = None
             for ind, subcategory_data in enumerate(subcategories, 1):
                 df = subcategory_data['df']
                 x_data = np.array(df[datapoint_column_name]).astype(np.float)
+                raw_y_data = np.array(df[value_column_name]).astype(np.float)
+
                 x_data_min = x_data.min() if x_data_min is None else min(x_data_min, x_data.min())
                 x_data_max = x_data.max() if x_data_max is None else max(x_data_max, x_data.max())
+                y_data_max = raw_y_data.max() if y_data_max is None else max(y_data_max, raw_y_data.max())
 
             for ind, subcategory_data in enumerate(subcategories, 1):
                 subcategory = subcategory_data['subcategory']
@@ -340,12 +346,25 @@ class Command(BaseCommand):
                 plt.scatter(x=x_data, y=y_data, s=s, c=colour, label=subcategory, alpha=alpha, edgecolor='black', linewidth=1)
 
                 num_data_point = len(x_data)
-                order = min(3, num_data_point - 1)
                 if num_data_point > 1:
-                    poly1d = np.poly1d(np.polyfit(x_data, raw_y_data, order))
-                    poly_x = np.linspace(x_data_min, x_data_max, 300)
-                    poly_y = poly1d(poly_x)
-                    plt.plot(poly_x, poly_y, c=colour, linestyle='dashed')
+                    if hyperbola:
+
+                        # We need to add a small value to all x data to avoid 1/0
+                        x_epsilon = 5
+                        x_data += x_epsilon
+                        one_over_x = 1 / x_data
+                        try:
+                            poly1d = np.poly1d(np.polyfit(one_over_x, raw_y_data, 1))
+                        except:
+                            x = 0
+                        poly_one_over_x = 1 / np.linspace(x_data_min + x_epsilon, x_data_max + x_epsilon, 300)
+                        poly_y = poly1d(poly_one_over_x)
+                        plt.plot(1/poly_one_over_x - x_epsilon, poly_y, c=colour, linestyle='dashed')
+                    else:
+                        poly1d = np.poly1d(np.polyfit(x_data, raw_y_data, 1))
+                        poly_x = np.linspace(x_data_min, x_data_max, 300)
+                        poly_y = poly1d(poly_x)
+                        plt.plot(poly_x, poly_y, c=colour, linestyle='dashed')
 
                 subcategories_names.append(subcategory)
                 subcategories_indx.append(ind)
@@ -372,13 +391,14 @@ class Command(BaseCommand):
                                 'weight': 'bold',
                                 'size': 18})
 
-            plt.ylim((-5, plt.ylim()[1]))
+            plt.ylim((-5, y_data_max + 5))
 
             plt.savefig(file_path)
             plt.close()
+            print('Saved to ' + file_path)
 
     def handle(self, *args, **options):
-        files = ['osm_database/cache/calculate_nearest_points_with_correction/xlsx/2New-relatum-points-corrected-calculated.xlsx',
+        files = ['osm_database/cache/calculate_nearest_points_with_correction/xlsx/2New-relatum-points-corrected-calculatedNormalised-corrected-calculated.xlsx',
                  'osm_database/cache/calculate_nearest_points_with_correction/xlsx/ArcGis6Relata-corrected-calculated.xlsx']
         img_dir = os.path.join(cache_dir, 'png')
         pathlib.Path(img_dir).mkdir(parents=True, exist_ok=True)
@@ -392,22 +412,22 @@ class Command(BaseCommand):
 
         categories_details = self.database.get_categories_details('Preposition', 'Relatum', 'Distance (b2b)', 'Fre')
         # self.plot(categories_details, 'Distance (b2b)', 'Fre', img_dir, 'data_for_plotting1-b2b', 'gigigi')
-        # self.plot(categories_details, 'Distance (b2b)', 'Fre', img_dir, 'data_for_plotting1-b2b', 'gigigi-accum')
+        self.plot(categories_details, 'Distance (b2b)', 'Fre', img_dir, 'data_for_plotting1-b2b', 'gigigi-accum')
         # self.plot(categories_details, 'Distance (b2b)', 'Fre', img_dir, 'data_for_plotting1-b2b', 'stacked')
         # self.plot(categories_details, 'Distance (b2b)', 'Fre', img_dir, 'data_for_plotting1-b2b', 'stacked-trim')
         # self.plot(categories_details, 'Distance (b2b)', 'Fre', img_dir, 'data_for_plotting1-b2b', 'gigili')
-        self.plot(categories_details, 'Distance (b2b)', 'Fre', img_dir, 'data_for_plotting1-b2b', 'normal-samesize')
+        self.plot(categories_details, 'Distance (b2b)', 'Fre', img_dir, 'data_for_plotting1-b2b', 'normal-samesize-hyperbola')
 
         categories_details = self.database.get_categories_details('Preposition', 'Relatum', 'Distance (c2b)', 'Fre')
         # self.plot(categories_details,'Distance (c2b)', 'Fre', img_dir, 'data_for_plotting1-c2b', 'gigigi')
         # self.plot(categories_details,'Distance (c2b)', 'Fre', img_dir, 'data_for_plotting1-c2b', 'gigili')
-        self.plot(categories_details,'Distance (c2b)', 'Fre', img_dir, 'data_for_plotting1-c2b', 'normal-samesize')
+        # self.plot(categories_details,'Distance (c2b)', 'Fre', img_dir, 'data_for_plotting1-c2b', 'normal-samesize')
 
         categories_details = self.database.get_categories_details('Relatum', 'Preposition', 'Distance (b2b)', 'Fre')
-        self.plot(categories_details, 'Distance (b2b)', 'Fre', img_dir, 'data_for_plotting2-b2b', 'normal-samesize')
-        # self.plot(categories_details, 'Distance (b2b)', 'Fre', img_dir, 'data_for_plotting2-b2b', 'gigigi-accum')
+        # self.plot(categories_details, 'Distance (b2b)', 'Fre', img_dir, 'data_for_plotting2-b2b', 'normal-samesize')
+        self.plot(categories_details, 'Distance (b2b)', 'Fre', img_dir, 'data_for_plotting2-b2b', 'gigigi-accum')
 
         categories_details = self.database.get_categories_details('Relatum', 'Preposition', 'Distance (c2b)','Fre')
         # self.plot(categories_details, 'Distance (c2b)', 'Fre', img_dir, 'data_for_plotting2-c2b', 'gigigi')
         # self.plot(categories_details, 'Distance (c2b)', 'Fre', img_dir, 'data_for_plotting2-c2b', 'gigigi-accum')
-        self.plot(categories_details, 'Distance (c2b)', 'Fre', img_dir, 'data_for_plotting2-c2b', 'normal-samesize')
+        # self.plot(categories_details, 'Distance (c2b)', 'Fre', img_dir, 'data_for_plotting2-c2b', 'normal-samesize')
