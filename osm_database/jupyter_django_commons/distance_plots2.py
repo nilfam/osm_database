@@ -302,6 +302,7 @@ class Plotter:
 
             fig = plt.figure(figsize=(10, 7))
             plt.subplots_adjust(bottom=0.1, top=0.9)
+            ax1 = fig.gca()
 
             retval[file_name] = fig
 
@@ -344,7 +345,6 @@ class Plotter:
             new_xticks = np.arange(max(0, min(xticks)) - 100, max(xticks), 100)
             plt.xticks(new_xticks, rotation=90, ha='center')
             ml = MultipleLocator(20)
-            ax1 = fig.gca()
             ax1.xaxis.set_minor_locator(ml)
             ax1.tick_params('x', length=20, width=2, which='major')
             ax1.tick_params('x', length=10, width=1, which='minor')
@@ -373,12 +373,17 @@ class Plotter:
             table_headings = []
             table_columns_x_data = []
             table_columns_y_data = []
+            if accum:
+                table_columns_y_data_accum = []
             max_data_length = 0
 
             for ind, subcategory_data in enumerate(subcategories, 1):
                 subcategory = subcategory_data['subcategory']
                 table_headings.append(subcategory + '-Dist')
                 table_headings.append(subcategory + '-Freq')
+                if accum:
+                    table_headings.append(subcategory + '-Freq-Accum')
+
                 df = subcategory_data['df']
                 x_data = np.array(df[datapoint_column_name]).astype(np.float)
                 y_data = np.array(df[value_column_name]).astype(np.float)
@@ -388,24 +393,31 @@ class Plotter:
                 y_data = y_data[sort_order]
 
                 if accum:
-                    y_data = np.add.accumulate(y_data)
+                    y_data_accum = np.add.accumulate(y_data)
 
                 table_columns_x_data.append(x_data)
                 table_columns_y_data.append(y_data)
+
+                if accum:
+                    table_columns_y_data_accum.append(y_data_accum)
                 max_data_length = max(max_data_length, len(x_data))
 
             df = pd.DataFrame(columns=table_headings)
             for i in range(max_data_length):
                 row = []
-                for x_data, y_data in zip(table_columns_x_data, table_columns_y_data):
-                    if i >= len(x_data):
-                        x = ''
-                        y = ''
-                    else:
-                        x = x_data[i]
-                        y = y_data[i]
-                    row.append(x)
-                    row.append(y)
+                if accum:
+                    table_columns = zip(table_columns_x_data, table_columns_y_data, table_columns_y_data_accum)
+                else:
+                    table_columns = zip(table_columns_x_data, table_columns_y_data)
+
+                for columns in table_columns:
+                    for column in columns:
+                        if i >= len(column):
+                            cell = ''
+                        else:
+                            cell = column[i]
+                        row.append(cell)
+
                 df.loc[i] = row
 
             retval[category] = df
@@ -418,7 +430,6 @@ class Plotter:
             category = category_details['category']
 
             file_name = image_name_prefix + '-' + category.replace(' ', '_')
-            file_path = os.path.join(file_name)
 
             subcategories = category_details['subcategories']
             fig = plt.figure(figsize=(10, 7))

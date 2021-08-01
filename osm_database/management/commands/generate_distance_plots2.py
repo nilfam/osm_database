@@ -25,8 +25,8 @@ class Command(BaseCommand):
         if result_type == 'figure':
             for plot_name, fig in results.items():
                 file_path = os.path.join(img_dir, plot_name)
-                plt.savefig(file_path)
-                plt.close()
+                fig.savefig(file_path)
+                plt.close(fig)
         elif results is not None:
             file_name = image_name_prefix + '-table.xlsx'
             file_path = os.path.join(img_dir, file_name)
@@ -351,7 +351,7 @@ class Command(BaseCommand):
             print('Saved to ' + file_path)
 
     def add_arguments(self, parser):
-        parser.add_argument('--legend', action='store', dest='show_legend', default='no', type=str)
+        parser.add_argument('--legend', action='store', dest='show_legend', default='both', type=str)
 
     def handle(self, *args, **options):
         show_legend = options['show_legend']
