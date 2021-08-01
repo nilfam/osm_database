@@ -1,6 +1,5 @@
 import os
 import pathlib
-import re
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -8,7 +7,8 @@ import pandas as pd
 from django.core.management import BaseCommand
 from scipy.interpolate import interp1d
 
-pattern = re.compile(r'([\d\-.]+ [\d\-.]+)', re.I | re.U)
+from osm_database.jupyter_django_commons.distance_plots2 import full_labels, Plotter
+from osm_database.management.commands.generate_distance_plots3 import detect_point_of_flatting
 
 current_dir = os.path.dirname(os.path.abspath(__file__))
 script_name = os.path.split(__file__)[1][0:-3]
@@ -16,107 +16,48 @@ dir_parts = current_dir.split(os.path.sep)
 cache_dir = os.path.join(os.path.sep.join(dir_parts[0:dir_parts.index('management')]), 'cache', script_name)
 
 
-def normalise(arr, minval, maxval):
-    arr_min = arr.min()
-    arr_max = arr.max()
-    return (arr - arr_min) / (arr_max) * (maxval - minval) + minval
-
-
-class Database:
-    """
-    A database contains a map from preposition -> preposition data
-    """
-    def __init__(self):
-        self.data = []
-        self.npdata = None
-        self.column_names = ['Preposition', 'Relatum', 'Locatum', 'Distance (b2b)', 'Distance (c2b)','Fre']
-
-    def add_row(self, row, for_rels):
-        preposition = row['Preposition'].lower()
-        relatum = row['Relatum']
-
-        if relatum not in for_rels:
-            return
-
-        locatum = row['Locatum']
-        b2b = row['Distance (b2b)']
-        c2b = row['Distance (c2b)']
-        Fre = row['Fre']
-
-        self.data.append((preposition, relatum, locatum, b2b, c2b, Fre))
-
-    def finalise(self):
-        self.npdata = np.array(self.data)
-
-    def get_categories_details(self, category, subcategory_name, datapoint_column_name, value_column_name):
-        categories_details = []
-
-        category_column_ind = self.column_names.index(category)
-        subcategory_column_ind = self.column_names.index(subcategory_name)
-        datapoint_column_ind = self.column_names.index(datapoint_column_name)
-        value_column_ind = self.column_names.index(value_column_name)
-
-        unique_categories = np.unique(self.npdata[:, category_column_ind])
-
-        for category in unique_categories:
-            indices = np.where(self.npdata[:, category_column_ind] == category)
-            category_data = self.npdata[indices]
-            unique_subcategories = np.unique(category_data[:, subcategory_column_ind])
-
-            subcategories_data = []
-            for subcategory in unique_subcategories:
-                indices = np.where(category_data[:, subcategory_column_ind] == subcategory)
-                df_data = category_data[indices][:, (datapoint_column_ind, value_column_ind)]
-                df = pd.DataFrame(columns=[datapoint_column_name, value_column_name], data=df_data)
-                subcategories_data.append(dict(df=df, subcategory=subcategory))
-
-            categories_details.append(dict(category=category, subcategories=subcategories_data))
-
-        return categories_details
-
-
-full_labels = {
-    'Fre': 'Frequency',
-    'Distance (c2b)': 'Distance from locatum centroid to relatum boundary',
-    'Distance (b2b)': 'Distance from locatum boundary to relatum boundary',
-}
-
-
 class Command(BaseCommand):
-    def __init__(self):
-        super().__init__()
-        self.database = Database()
-
-    def populate_objects_from_excel(self, file, for_rels):
-        xl = pd.ExcelFile(file)
-
-        for sheet_name in xl.sheet_names:
-            df = xl.parse(sheet_name, keep_default_na=False)
-            df = df.fillna('')
-
-            for row_num, row in df.iterrows():
-                self.database.add_row(row, for_rels)
 
     def plot(self, categories_details, datapoint_column_name, value_column_name, img_dir, image_name_prefix, type='gigigi'):
-        image_name_prefix += '_' + type
-        if type.startswith('gigigi'):
-            accum = type.endswith('-accum')
-            self._plot_gigigi(categories_details, datapoint_column_name, value_column_name, img_dir, image_name_prefix, accum)
-        elif type.startswith('stacked'):
-            trim = type.endswith('-trim')
-            self._plot_interpolated(categories_details, datapoint_column_name, value_column_name, img_dir, image_name_prefix, trim)
-        elif type.startswith('normal'):
-            same_size = type.find('-samesize') > -1
-            hyperbola = type.endswith('-hyperbola')
-            self._plot_scatter(categories_details, datapoint_column_name, value_column_name, img_dir, image_name_prefix,
-                               same_size, hyperbola, yaxis_is_frequency=True)
-        else:
-            same_size = False
-            hyperbola = False
-            self._plot_scatter(categories_details, datapoint_column_name, value_column_name, img_dir, image_name_prefix,
-                               same_size, hyperbola, yaxis_is_frequency=False)
+        results, result_type = self.plotter.plot(categories_details, datapoint_column_name, value_column_name,
+                                                 image_name_prefix, type)
 
-    def _plot_interpolated(selfself, categories_details, datapoint_column_name, value_column_name, img_dir, image_name_prefix, trim):
+        if result_type == 'figure':
+            for plot_name, fig in results.items():
+                file_path = os.path.join(img_dir, plot_name)
+                plt.savefig(file_path)
+                plt.close()
+        elif results is not None:
+            file_name = image_name_prefix + '-table.xlsx'
+            file_path = os.path.join(img_dir, file_name)
+            # Create a Pandas Excel writer using XlsxWriter as the engine.
+            writer = pd.ExcelWriter(file_path, engine='xlsxwriter')
+
+            for sheet_name, df in results.items():
+                df.to_excel(writer, sheet_name=sheet_name)
+
+            writer.save()
+
+        # image_name_prefix += '_' + type
+        # if type.startswith('gigigi'):
+        #     accum = type.endswith('-accum')
+        #     highlight = '-highlight' in type
+        #     self._plot_gigigi(categories_details, datapoint_column_name, value_column_name, img_dir, image_name_prefix, accum, highlight)
+        # elif type.startswith('stacked'):
+        #     trim = type.endswith('-trim')
+        #     self._plot_interpolated(categories_details, datapoint_column_name, value_column_name, img_dir, image_name_prefix, trim)
+        # elif type.startswith('normal'):
+        #     same_size = type.find('-samesize') > -1
+        #     hyperbola = type.endswith('-hyperbola')
+        #     self._plot_scatter(categories_details, datapoint_column_name, value_column_name, img_dir, image_name_prefix,
+        #                        same_size, hyperbola, yaxis_is_frequency=True)
+        # else:
+        #     same_size = False
+        #     hyperbola = False
+        #     self._plot_scatter(categories_details, datapoint_column_name, value_column_name, img_dir, image_name_prefix,
+        #                        same_size, hyperbola, yaxis_is_frequency=False)
+
+    def _plot_interpolated(self, categories_details, datapoint_column_name, value_column_name, img_dir, image_name_prefix, trim):
         for category_details in categories_details:
             category = category_details['category']
 
@@ -244,7 +185,7 @@ class Command(BaseCommand):
             plt.savefig(file_path)
             plt.close()
 
-    def _plot_gigigi(self, categories_details, datapoint_column_name, value_column_name, img_dir, image_name_prefix, accum=False):
+    def _plot_gigigi(self, categories_details, datapoint_column_name, value_column_name, img_dir, image_name_prefix, accum=False, highlight=False):
         for category_details in categories_details:
             category = category_details['category']
 
@@ -253,10 +194,7 @@ class Command(BaseCommand):
 
             subcategories = category_details['subcategories']
 
-
             fg = plt.figure(figsize=(10, 7))
-            # plt.xticks(rotation=90, ha='right')
-            # plt.subplots_adjust(bottom=0.4, top=0.99)
 
             import itertools
             marker = itertools.cycle(("$f$", 'o', r"$\mathcal{A}$","$1$", 's',5, 'h', 1))
@@ -278,7 +216,22 @@ class Command(BaseCommand):
 
                 plt.plot(x_data, y_data, label=subcategory, marker='o')
 
+                if highlight:
+                    flatting_point_ind = detect_point_of_flatting(y_data, '2%', 5)
+                    if flatting_point_ind is not None:
+                        flatting_point_x = x_data[flatting_point_ind]
+                        flatting_point_y = y_data[flatting_point_ind]
+
+                        plt.scatter(x=flatting_point_x, y=flatting_point_y, s=150, c='red')
+                        plt.annotate(str(int(flatting_point_y)),
+                                     xy=(flatting_point_x, flatting_point_y),
+                                     xytext=(20, 10), textcoords='offset pixels',
+                                     horizontalalignment='right',
+                                     verticalalignment='bottom')
+
             legend = plt.legend(fontsize=10)
+            if not self.plotter.legend_on:
+                legend.remove()
 
             plt.xlabel(full_labels.get(datapoint_column_name, datapoint_column_name))
             plt.ylabel(full_labels.get(value_column_name, value_column_name))
@@ -397,37 +350,65 @@ class Command(BaseCommand):
             plt.close()
             print('Saved to ' + file_path)
 
+    def add_arguments(self, parser):
+        parser.add_argument('--legend', action='store', dest='show_legend', default='no', type=str)
+
     def handle(self, *args, **options):
-        files = ['osm_database/cache/calculate_nearest_points_with_correction/xlsx/2New-relatum-points-corrected-calculatedNormalised-corrected-calculated.xlsx',
-                 'osm_database/cache/calculate_nearest_points_with_correction/xlsx/ArcGis6Relata-corrected-calculated.xlsx']
-        img_dir = os.path.join(cache_dir, 'png')
-        pathlib.Path(img_dir).mkdir(parents=True, exist_ok=True)
+        show_legend = options['show_legend']
+        files = [
+            'osm_database/cache/calculate_nearest_points_with_correction/xlsx/2New-relatum-points-corrected-calculatedNormalised-corrected-calculated.xlsx',
+            'osm_database/cache/calculate_nearest_points_with_correction/xlsx/ArcGis6Relata-corrected-calculatedNormalised.xlsx'
+        ]
+        column_names = ['Preposition', 'Relatum', 'Locatum', 'Distance (b2b)', 'Distance (c2b)', 'Fre']
+
+        self.plotter = Plotter(column_names)
+        self.plotter.get_database(files)
 
         for_rels = ['Buckingham Palace', 'Hyde Park', 'Trafalgar Square']
 
         for file in files:
-            self.populate_objects_from_excel(file, for_rels)
+            self.plotter.populate_objects_from_excel(file, for_rels)
 
-        self.database.finalise()
+        self.plotter.database.finalise()
 
-        categories_details = self.database.get_categories_details('Preposition', 'Relatum', 'Distance (b2b)', 'Fre')
-        # self.plot(categories_details, 'Distance (b2b)', 'Fre', img_dir, 'data_for_plotting1-b2b', 'gigigi')
-        self.plot(categories_details, 'Distance (b2b)', 'Fre', img_dir, 'data_for_plotting1-b2b', 'gigigi-accum')
-        # self.plot(categories_details, 'Distance (b2b)', 'Fre', img_dir, 'data_for_plotting1-b2b', 'stacked')
-        # self.plot(categories_details, 'Distance (b2b)', 'Fre', img_dir, 'data_for_plotting1-b2b', 'stacked-trim')
-        # self.plot(categories_details, 'Distance (b2b)', 'Fre', img_dir, 'data_for_plotting1-b2b', 'gigili')
-        self.plot(categories_details, 'Distance (b2b)', 'Fre', img_dir, 'data_for_plotting1-b2b', 'normal-samesize-hyperbola')
+        plot_config = []
 
-        categories_details = self.database.get_categories_details('Preposition', 'Relatum', 'Distance (c2b)', 'Fre')
-        # self.plot(categories_details,'Distance (c2b)', 'Fre', img_dir, 'data_for_plotting1-c2b', 'gigigi')
-        # self.plot(categories_details,'Distance (c2b)', 'Fre', img_dir, 'data_for_plotting1-c2b', 'gigili')
-        # self.plot(categories_details,'Distance (c2b)', 'Fre', img_dir, 'data_for_plotting1-c2b', 'normal-samesize')
+        if show_legend == 'yes' or show_legend == 'both':
+            plot_config.append((os.path.join(cache_dir, 'png'), True))
+        if show_legend == 'no' or show_legend == 'both':
+            plot_config.append((os.path.join(cache_dir, 'png-no-legend'), False))
 
-        categories_details = self.database.get_categories_details('Relatum', 'Preposition', 'Distance (b2b)', 'Fre')
-        # self.plot(categories_details, 'Distance (b2b)', 'Fre', img_dir, 'data_for_plotting2-b2b', 'normal-samesize')
-        self.plot(categories_details, 'Distance (b2b)', 'Fre', img_dir, 'data_for_plotting2-b2b', 'gigigi-accum')
+        for img_dir, legend_on in plot_config:
+            self.plotter.legend_on = legend_on
+            pathlib.Path(img_dir).mkdir(parents=True, exist_ok=True)
 
-        categories_details = self.database.get_categories_details('Relatum', 'Preposition', 'Distance (c2b)','Fre')
-        # self.plot(categories_details, 'Distance (c2b)', 'Fre', img_dir, 'data_for_plotting2-c2b', 'gigigi')
-        # self.plot(categories_details, 'Distance (c2b)', 'Fre', img_dir, 'data_for_plotting2-c2b', 'gigigi-accum')
-        # self.plot(categories_details, 'Distance (c2b)', 'Fre', img_dir, 'data_for_plotting2-c2b', 'normal-samesize')
+
+            categories_details = self.plotter.database.get_categories_details('Preposition', 'Relatum', 'Distance (b2b)', 'Fre')
+            # self.plot(categories_details, 'Distance (b2b)', 'Fre', img_dir, 'data_for_plotting1-b2b', 'gigigi')
+            # self.plot(categories_details, 'Distance (b2b)', 'Fre', img_dir, 'data_for_plotting1-b2b', 'gigigi-accum')
+            # self.plot(categories_details, 'Distance (b2b)', 'Fre', img_dir, 'data_for_plotting1-b2b', 'stacked')
+            # self.plot(categories_details, 'Distance (b2b)', 'Fre', img_dir, 'data_for_plotting1-b2b', 'stacked-trim')
+            # self.plot(categories_details, 'Distance (b2b)', 'Fre', img_dir, 'data_for_plotting1-b2b', 'gigili')
+            # self.plot(categories_details, 'Distance (b2b)', 'Fre', img_dir, 'data_for_plotting1-b2b', 'normal-samesize-hyperbola')
+            self.plot(categories_details, 'Distance (b2b)', 'Fre', img_dir, 'data_for_plotting1-b2b', 'gigigi-accum-highlight')
+            self.plot(categories_details, 'Distance (b2b)', 'Fre', img_dir, 'data_for_plotting1-b2b', 'table-accum')
+
+            categories_details = self.plotter.database.get_categories_details('Preposition', 'Relatum', 'Distance (c2b)', 'Fre')
+            # self.plot(categories_details,'Distance (c2b)', 'Fre', img_dir, 'data_for_plotting1-c2b', 'gigigi')
+            # self.plot(categories_details,'Distance (c2b)', 'Fre', img_dir, 'data_for_plotting1-c2b', 'gigili')
+            # self.plot(categories_details,'Distance (c2b)', 'Fre', img_dir, 'data_for_plotting1-c2b', 'normal-samesize')
+            self.plot(categories_details,'Distance (c2b)', 'Fre', img_dir, 'data_for_plotting1-c2b', 'gigigi-accum-highlight')
+            self.plot(categories_details,'Distance (c2b)', 'Fre', img_dir, 'data_for_plotting1-c2b', 'table-accum')
+
+            categories_details = self.plotter.database.get_categories_details('Relatum', 'Preposition', 'Distance (b2b)', 'Fre')
+            # self.plot(categories_details, 'Distance (b2b)', 'Fre', img_dir, 'data_for_plotting2-b2b', 'normal-samesize')
+            # self.plot(categories_details, 'Distance (b2b)', 'Fre', img_dir, 'data_for_plotting2-b2b', 'gigigi-accum')
+            self.plot(categories_details, 'Distance (b2b)', 'Fre', img_dir, 'data_for_plotting2-b2b', 'gigigi-accum-highlight')
+            self.plot(categories_details, 'Distance (b2b)', 'Fre', img_dir, 'data_for_plotting2-b2b', 'table-accum')
+
+            categories_details = self.plotter.database.get_categories_details('Relatum', 'Preposition', 'Distance (c2b)','Fre')
+            # self.plot(categories_details, 'Distance (c2b)', 'Fre', img_dir, 'data_for_plotting2-c2b', 'gigigi')
+            # self.plot(categories_details, 'Distance (c2b)', 'Fre', img_dir, 'data_for_plotting2-c2b', 'gigigi-accum')
+            # self.plot(categories_details, 'Distance (c2b)', 'Fre', img_dir, 'data_for_plotting2-c2b', 'normal-samesize')
+            self.plot(categories_details, 'Distance (c2b)', 'Fre', img_dir, 'data_for_plotting2-c2b', 'gigigi-accum-highlight')
+            self.plot(categories_details, 'Distance (c2b)', 'Fre', img_dir, 'data_for_plotting2-c2b', 'table-accum')

@@ -13,7 +13,8 @@ from progress.bar import Bar
 from shapely.geometry import Point
 from shapely.ops import nearest_points
 
-from osm_database.management.commands.calculate_nearest_points import fix_wkt_str_if_necessary
+from osm_database.management.commands.calculate_nearest_points import fix_wkt_str_if_necessary, \
+    reverse_wkt_for_visualisation
 from osm_database.management.commands.util import extract_points_for_polygons, extract_points_for_point
 from osm_database.models import OsmEntity
 
@@ -27,15 +28,31 @@ cache_dir = os.path.join(os.path.sep.join(dir_parts[0:dir_parts.index('managemen
 
 cache = {}
 
+polygon_for_buckingham_str = fix_wkt_str_if_necessary('POLYGON ((-0.1414478 51.5004912, -0.1413575 51.5004168, -0.1411859 51.5004769, -0.1412582 51.5005324, -0.1412292 51.5005103, -0.1408867 51.5006834, -0.1408787 51.5006778, -0.1411113 51.500418, -0.1410233 51.5003477, -0.1413553 51.5002015, -0.1415197 51.5001309, -0.1421681 51.4998456, -0.1429618 51.4995133, -0.1430538 51.4994539, -0.1430736 51.4994107, -0.1434675 51.49897, -0.1435577 51.4987364, -0.143735 51.4985128, -0.1437777 51.4985128, -0.1437934 51.4984895, -0.1438107 51.4984687, -0.1438057 51.4984483, -0.1440177 51.4982276, -0.1441394 51.4982036, -0.1444667 51.4982508, -0.1451252 51.4983121, -0.1460595 51.4983121, -0.1466704 51.4982971, -0.1469263 51.4983326, -0.1476788 51.4992781, -0.1479532 51.4995336, -0.1480988 51.4996669, -0.1484046 51.4999764, -0.1490604 51.500372, -0.1496317 51.5007262, -0.1501158 51.501029, -0.151032 51.5016886, -0.1511355 51.5018037, -0.1503356 51.5020898, -0.1497485 51.5023315, -0.1495841 51.5023599, -0.1493132 51.5023783, -0.1488116 51.5023583, -0.1482296 51.5023349, -0.1470065 51.5022814, -0.1449198 51.5022046, -0.1439568 51.5021813, -0.1429935 51.5021297, -0.1428768 51.5020207, -0.1427784 51.5019496, -0.1426426 51.501823, -0.1426323 51.5018272, -0.1425728 51.5017716, -0.142586 51.5017662, -0.1424654 51.501653, -0.1421985 51.5017631, -0.1420925 51.5016636, -0.1421116 51.5016557, -0.1418684 51.5014271, -0.1418405 51.5014386, -0.1417575 51.5013606, -0.1416908 51.5012979, -0.1417206 51.5012856, -0.1414697 51.5010496, -0.141453 51.5010564, -0.141345 51.5009548, -0.1416102 51.5008455, -0.1414989 51.5007408, -0.1414856 51.5007463, -0.141422 51.5006865, -0.1414353 51.500681, -0.1412988 51.5005525, -0.1413536 51.50053, -0.141341 51.5005182, -0.1414058 51.5004915, -0.1414184 51.5005034, -0.1414478 51.5004912))')
+polygon_for_buckingham = shapely.wkt.loads(polygon_for_buckingham_str)
+
+cache['Buckingham Palace'] = [4256976, 'way', polygon_for_buckingham.centroid, polygon_for_buckingham_str]
+
 
 class ExcelRow:
     def get_geoinfo_for_name(self, name, osm_id=None, osm_type=None):
         if name in cache:
-            return cache[name]
+            if name == 'Buckingham Palace':
+                if osm_id is None:
+                    osm_id = 4256976
+                if osm_type is None:
+                    osm_type = 'way'
+                return [osm_id, osm_type, polygon_for_buckingham.centroid, polygon_for_buckingham_str]
 
         if osm_id is not None and osm_id != '':
             if osm_type is not None and osm_type != '':
-                osm_entities = OsmEntity.objects.filter(osm_id=int(osm_id), osm_type=osm_type.upper())
+                if osm_type == 'N':
+                    osm_type = 'node'
+                elif osm_type == 'W':
+                    osm_type = 'way'
+                elif osm_type == 'R':
+                    osm_type = 'relation'
+                osm_entities = OsmEntity.objects.filter(osm_id=int(osm_id), osm_type=osm_type)
             else:
                 osm_entities = OsmEntity.objects.filter(osm_id=int(osm_id))
         else:
@@ -85,6 +102,8 @@ class ExcelRow:
 
     def __init__(self, row):
         self.location = row['Locatum']
+        if self.location == '':
+            raise Exception('Row is empty')
         self.preposition = row['Preposition']
         self.relatum = row['Relatum']
         self.frequency = row['Fre']
@@ -162,7 +181,10 @@ class Command(BaseCommand):
             df = df.fillna('')
 
             for row_num, row in df.iterrows():
-                ExcelRow(row)
+                try:
+                    ExcelRow(row)
+                except:
+                    print('Row #{} is empty'.format(row_num))
 
     def populate_objects_from_excel(self, file):
         xl = pd.ExcelFile(file)
@@ -175,7 +197,11 @@ class Command(BaseCommand):
             excel_rows = []
 
             for row_num, row in df.iterrows():
-                excel_rows.append(ExcelRow(row))
+                try:
+                    excel_row = ExcelRow(row)
+                    excel_rows.append(excel_row)
+                except:
+                    print('Row #{} is empty'.format(row_num))
 
             self.sheets[sheet_name] = excel_rows
 
@@ -239,11 +265,11 @@ class Command(BaseCommand):
                 row = [
                     r.location, r.preposition, r.relatum, r.loc_osm_type, r.loc_id, r.rel_osm_type, r.rel_id, r.frequency,
 
-                    r.centroid_loc.x, r.centroid_loc.y, r.boundary_loc_str,
+                    r.centroid_loc.x, r.centroid_loc.y, reverse_wkt_for_visualisation(r.boundary_loc_str),
 
                     r.type, r.category, r.geojson_type,
 
-                    r.centroid_rel.x, r.centroid_rel.y, r.boundary_rel_str,
+                    r.centroid_rel.x, r.centroid_rel.y, reverse_wkt_for_visualisation(r.boundary_rel_str),
                     
                     r.loc_nearest_boundary_point,
                     r.rel_nearest_boundary_point,

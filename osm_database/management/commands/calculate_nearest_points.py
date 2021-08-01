@@ -18,7 +18,11 @@ dir_parts = current_dir.split(os.path.sep)
 cache_dir = os.path.join(os.path.sep.join(dir_parts[0:dir_parts.index('management')]), 'cache', script_name)
 
 
-def fix_wkt_str_if_necessary(wkt_str):
+def reverse_wkt_for_visualisation(wkt_str):
+    return fix_wkt_str_if_necessary(wkt_str, False)
+
+
+def fix_wkt_str_if_necessary(wkt_str, for_shapely=True):
     """ Some polygons have lat long swapped, so we need to swap back. The key is
         that the latitude is always 50+, while longitude is -0.1x
         Some polygons have the last point different to the first point. WKT specification requires
@@ -28,7 +32,12 @@ def fix_wkt_str_if_necessary(wkt_str):
 
     for m in pattern.finditer(wkt_str):
         lat, lon = map(float, m.groups()[0].split(' '))
-        if lat < 10:
+        needs_reverse = False
+        if for_shapely and lat < 10:
+            needs_reverse = True
+        elif not for_shapely and lat > 10:
+            needs_reverse = True
+        if needs_reverse:
             replaces.append(['{} {}'.format(lat, lon), '{} {}'.format(lon, lat)])
 
     for original, correct in replaces:
