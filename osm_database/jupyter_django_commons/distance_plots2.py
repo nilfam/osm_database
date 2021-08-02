@@ -18,33 +18,37 @@ def normalise(arr, minval, maxval):
     return (arr - arr_min) / (arr_max) * (maxval - minval) + minval
 
 
-def detect_point_of_flatting(y_data, threshold, min_threshold=None, max_threshold=None):
-    max_y_data = y_data.max()
-    if isinstance(threshold, str) and threshold.endswith('%'):
-        percent = float(threshold[:-1])
-        stop_threshold = max_y_data * percent / 100
-    else:
-        stop_threshold = float(threshold)
+def detect_point_of_flatting(x_data, y_data, threshold, min_threshold=None, max_threshold=None):
+    dx = np.diff(x_data)
+    # dx = x_data[-1] - x_data[:-1]
+    dx_zero_indx = np.where(dx == 0)
+    dx[dx_zero_indx] = 1
+
+    dy = np.diff(y_data)
+    # dy = y_data[-1] - y_data[:-1]
+    slopes = np.true_divide(dy, dx)
+    slopes = np.arctan(slopes) / np.pi * 180
+
+    slopes[dx_zero_indx] = 180
 
     if max_threshold is not None:
-        stop_threshold = min(max_threshold, stop_threshold)
+        threshold = min(max_threshold, threshold)
 
     if min_threshold is not None:
-        stop_threshold = max(stop_threshold, min_threshold)
+        threshold = max(threshold, min_threshold)
 
-    diff = y_data[1:] - y_data[:-1]
     flatting_point_ind = None
-    exceeded_previously = False
+    still_within_threshold_previously = False
 
-    for ind in range(len(diff) - 1, -1, -1):
-        exceeded_now = diff[ind] < stop_threshold
-        if not exceeded_previously and not exceeded_now:
+    for ind in range(len(slopes)-1, -1, -1):
+        still_within_threshold_now = slopes[ind] < threshold
+        if not still_within_threshold_previously and not still_within_threshold_now:
             break
-        if exceeded_previously and not exceeded_now:
+        if still_within_threshold_previously and not still_within_threshold_now:
             flatting_point_ind = ind + 1
             break
         else:
-            exceeded_previously = exceeded_now
+            still_within_threshold_previously = still_within_threshold_now
 
     return flatting_point_ind
 
@@ -322,7 +326,7 @@ class Plotter:
                 plt.plot(x_data, y_data, label=subcategory, marker='o')
 
                 if highlight:
-                    flatting_point_ind = detect_point_of_flatting(y_data, '2%', 5)
+                    flatting_point_ind = detect_point_of_flatting(x_data, y_data, 5)
                     if flatting_point_ind is not None:
                         flatting_point_x = x_data[flatting_point_ind]
                         flatting_point_y = y_data[flatting_point_ind]
