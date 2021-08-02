@@ -2,13 +2,10 @@ import os
 import pathlib
 
 import matplotlib.pyplot as plt
-import numpy as np
 import pandas as pd
 from django.core.management import BaseCommand
-from scipy.interpolate import interp1d
 
-from osm_database.jupyter_django_commons.distance_plots2 import full_labels, Plotter
-from osm_database.management.commands.generate_distance_plots3 import detect_point_of_flatting
+from osm_database.jupyter_django_commons.distance_plots2 import Plotter
 
 current_dir = os.path.dirname(os.path.abspath(__file__))
 script_name = os.path.split(__file__)[1][0:-3]
@@ -38,318 +35,6 @@ class Command(BaseCommand):
 
             writer.save()
 
-        # image_name_prefix += '_' + type
-        # if type.startswith('gigigi'):
-        #     accum = type.endswith('-accum')
-        #     highlight = '-highlight' in type
-        #     self._plot_gigigi(categories_details, datapoint_column_name, value_column_name, img_dir, image_name_prefix, accum, highlight)
-        # elif type.startswith('stacked'):
-        #     trim = type.endswith('-trim')
-        #     self._plot_interpolated(categories_details, datapoint_column_name, value_column_name, img_dir, image_name_prefix, trim)
-        # elif type.startswith('normal'):
-        #     same_size = type.find('-samesize') > -1
-        #     hyperbola = type.endswith('-hyperbola')
-        #     self._plot_scatter(categories_details, datapoint_column_name, value_column_name, img_dir, image_name_prefix,
-        #                        same_size, hyperbola, yaxis_is_frequency=True)
-        # else:
-        #     same_size = False
-        #     hyperbola = False
-        #     self._plot_scatter(categories_details, datapoint_column_name, value_column_name, img_dir, image_name_prefix,
-        #                        same_size, hyperbola, yaxis_is_frequency=False)
-
-    def _plot_interpolated(self, categories_details, datapoint_column_name, value_column_name, img_dir, image_name_prefix, trim):
-        for category_details in categories_details:
-            category = category_details['category']
-
-            file_name = image_name_prefix + '-' + category.replace(' ', '_')
-            file_path = os.path.join(img_dir, file_name)
-
-            subcategories = category_details['subcategories']
-
-            plt.figure(figsize=(10, 7))
-
-            import itertools
-            marker = itertools.cycle(("$f$", 'o', r"$\mathcal{A}$","$1$", 's',5, 'h', 1))
-
-            colours = itertools.cycle(('blue', 'pink', 'yellow', 'orange', 'black', 'gray', 'purple', 'lime', 'brown', 1))
-
-            # Interpolate data here
-            all_x_data = np.array([])
-            subcategory_first_xs = []
-
-            for ind, subcategory_data in enumerate(subcategories, 1):
-                df = subcategory_data['df']
-                x_data = np.array(df[datapoint_column_name]).astype(np.float)
-                all_x_data = np.concatenate((all_x_data, x_data))
-                x_data_min = np.min(x_data)
-                subcategory_first_xs.append(x_data_min)
-
-            all_x_data.sort()
-            all_x_data = np.unique(all_x_data)
-
-            subcategory_order_by_min_x = np.argsort(subcategory_first_xs)
-            y_data_interpolated_accum = np.zeros(all_x_data.shape)
-
-            for ind in subcategory_order_by_min_x:
-                subcategory_data = subcategories[ind]
-
-            # for ind, subcategory_data in enumerate(subcategories, 1):
-                subcategory = subcategory_data['subcategory']
-                df = subcategory_data['df']
-                x_data = np.array(df[datapoint_column_name]).astype(np.float)
-                y_data = np.array(df[value_column_name]).astype(np.float)
-
-                # We need to sort - along x-axis first and then y-axis, this is because there values of x_data
-                # might not be all unique
-                sort_order = np.lexsort((y_data, x_data))
-                x_data = x_data[sort_order]
-                y_data = y_data[sort_order]
-
-                # First accumulate frequency data
-                y_data_accum = np.add.accumulate(y_data)
-
-                # Now linear interpolate. In case there's only one data point, the interpolation
-                # will simply be filled with that one value
-                if len(x_data) == 1:
-                    blah = 0
-                    y_data_interpolated = np.zeros(all_x_data.shape)
-                    y_data_interpolated[np.where(all_x_data == x_data[0])] = y_data_accum[0]
-                    y_data_interpolated = np.add.accumulate(y_data_interpolated)
-                else:
-                    y_interp = interp1d(x_data, y_data_accum, fill_value="extrapolate")
-                    y_data_interpolated = y_interp(all_x_data)
-                    nan_inds = np.where(np.isnan(y_data_interpolated))
-
-                    # Data cannot be interpolated between two datapoints that have the same x values.
-                    # In this case we need to interpolate the point based on differential equation -
-                    # which for linear interpolation is simply to take the average of y values
-                    for ind in nan_inds:
-                        x = all_x_data[ind]
-                        replacement = np.mean(y_data[np.where(x_data == x)])
-                        y_data_interpolated[ind] = replacement
-
-                    # Extrapolation can produce negative value, so we simply set them to zero
-                    # marked for removal later. This might not be the best way
-                    y_data_interpolated[np.where(y_data_interpolated < 0)] = 0
-                    y_data_interpolated[np.where(np.isnan(y_data_interpolated))] = 0
-                    # y_data_interpolated[np.where(all_x_data < x_data[0])] = 0
-                    # y_data_interpolated[np.where(all_x_data > x_data[-1])] = 0
-
-                # This is for stacking the next line on top of the previous line
-                # e.g. value to plot is current value plus accumulative prior values
-                y_data_interpolated_accum = y_data_interpolated_accum + y_data_interpolated
-
-                if trim:
-                    # Remove the interpolated points prior to the beginning of the actual array,
-                    # and after the end of the actual array. We do this by marking these point zeros
-                    y_data_interpolated[np.where(all_x_data < x_data[0])] = 0
-                    y_data_interpolated[np.where(all_x_data > x_data[-1])] = 0
-
-                # Mark all the non-zero points to keep, all the rest will be removed
-                points_to_keep = np.where(y_data_interpolated > 0)
-
-                # Actual points to be plotted, after removing zero points
-                x_to_plot = all_x_data[points_to_keep]
-                y_to_plot = y_data_interpolated_accum[points_to_keep]
-
-                # We find out which points are interpolated, which one are real
-                # So that we can draw a circle around them with different colours
-                interpolated_indx = np.empty(x_to_plot.shape, dtype=np.bool)
-                interpolated_indx.fill(False)
-                for i, x in enumerate(x_to_plot):
-                    interpolated_indx[i] = len(np.where(x_data == x)[0]) == 0
-
-                real_point_indx = np.logical_not(interpolated_indx)
-
-                # First, plot the line
-                color = next(colours)
-                plt.plot(x_to_plot, y_to_plot, label=subcategory, marker='.', color=color, markersize=15)
-
-                # Then, plot the interpolated points on top with red border
-                plt.scatter(x=x_to_plot[interpolated_indx], y=y_to_plot[interpolated_indx], s=150, c='red')
-
-                # Finally, plot the real points with green border
-                plt.scatter(x=x_to_plot[real_point_indx], y=y_to_plot[real_point_indx], s=150, c='green')
-
-            plt.legend(fontsize=10)
-
-            plt.xlabel(full_labels.get(datapoint_column_name, datapoint_column_name))
-            plt.ylabel(full_labels.get(value_column_name, value_column_name))
-
-            plt.title(file_name.replace('_', ' '),
-                      fontdict={'family': 'serif',
-                                'color': 'darkblue',
-                                'weight': 'bold',
-                                'size': 18})
-
-            plt.savefig(file_path)
-            plt.close()
-
-    def _plot_gigigi(self, categories_details, datapoint_column_name, value_column_name, img_dir, image_name_prefix, accum=False, highlight=False):
-        for category_details in categories_details:
-            category = category_details['category']
-
-            file_name = image_name_prefix + '-' + category.replace(' ', '_')
-            file_path = os.path.join(img_dir, file_name)
-
-            subcategories = category_details['subcategories']
-
-            fg = plt.figure(figsize=(10, 7))
-
-            import itertools
-            marker = itertools.cycle(("$f$", 'o', r"$\mathcal{A}$","$1$", 's',5, 'h', 1))
-
-            colours = itertools.cycle(('lightsteelblue', 'crimson', 'yellow', 'b', 'black', 'orange', 'lightcoral', 'lime', 'brown', 1))
-
-            for ind, subcategory_data in enumerate(subcategories, 1):
-                subcategory = subcategory_data['subcategory']
-                df = subcategory_data['df']
-                x_data = np.array(df[datapoint_column_name]).astype(np.float)
-                y_data = np.array(df[value_column_name]).astype(np.float)
-
-                x_sort_order = np.argsort(x_data)
-                x_data = x_data[x_sort_order]
-                y_data = y_data[x_sort_order]
-
-                if accum:
-                    y_data = np.add.accumulate(y_data)
-
-                plt.plot(x_data, y_data, label=subcategory, marker='o')
-
-                if highlight:
-                    flatting_point_ind = detect_point_of_flatting(y_data, '2%', 5)
-                    if flatting_point_ind is not None:
-                        flatting_point_x = x_data[flatting_point_ind]
-                        flatting_point_y = y_data[flatting_point_ind]
-
-                        plt.scatter(x=flatting_point_x, y=flatting_point_y, s=150, c='red')
-                        plt.annotate(str(int(flatting_point_y)),
-                                     xy=(flatting_point_x, flatting_point_y),
-                                     xytext=(20, 10), textcoords='offset pixels',
-                                     horizontalalignment='right',
-                                     verticalalignment='bottom')
-
-            legend = plt.legend(fontsize=10)
-            if not self.plotter.legend_on:
-                legend.remove()
-
-            plt.xlabel(full_labels.get(datapoint_column_name, datapoint_column_name))
-            plt.ylabel(full_labels.get(value_column_name, value_column_name))
-
-            plt.title(file_name.replace('_', ' '),
-                      fontdict={'family': 'serif',
-                                'color': 'darkblue',
-                                'weight': 'bold',
-                                'size': 18})
-
-            plt.savefig(file_path)
-            plt.close()
-
-    def _plot_scatter(self, categories_details, datapoint_column_name, value_column_name, img_dir, image_name_prefix,
-                      same_size, hyperbola, yaxis_is_frequency=True):
-        for category_details in categories_details:
-            category = category_details['category']
-
-            file_name = image_name_prefix + '-' + category.replace(' ', '_')
-            file_path = os.path.join(img_dir, file_name)
-
-            subcategories = category_details['subcategories']
-            plt.figure(figsize=(10, 7))
-
-            import itertools
-            colours = itertools.cycle(('red', 'blue', 'orange', 'black', 'purple', 'brown'))
-
-            subcategories_names = []
-            subcategories_indx = []
-
-            x_data_min = None
-            x_data_max = None
-            y_data_max = None
-            for ind, subcategory_data in enumerate(subcategories, 1):
-                df = subcategory_data['df']
-                x_data = np.array(df[datapoint_column_name]).astype(np.float)
-                raw_y_data = np.array(df[value_column_name]).astype(np.float)
-
-                x_data_min = x_data.min() if x_data_min is None else min(x_data_min, x_data.min())
-                x_data_max = x_data.max() if x_data_max is None else max(x_data_max, x_data.max())
-                y_data_max = raw_y_data.max() if y_data_max is None else max(y_data_max, raw_y_data.max())
-
-            for ind, subcategory_data in enumerate(subcategories, 1):
-                subcategory = subcategory_data['subcategory']
-                df = subcategory_data['df']
-                x_data = np.array(df[datapoint_column_name]).astype(np.float)
-                raw_y_data = np.array(df[value_column_name]).astype(np.float)
-
-                sort_order = np.lexsort((raw_y_data, x_data))
-                x_data = x_data[sort_order]
-                raw_y_data = raw_y_data[sort_order]
-
-                y_data = np.array(raw_y_data, copy=True)
-
-                if same_size:
-                    s = 50
-                    alpha = 1
-                else:
-                    s = y_data * 20
-                    alpha = 0.5
-                if not yaxis_is_frequency:
-                    y_data.fill(ind)
-
-                colour = next(colours)
-                plt.scatter(x=x_data, y=y_data, s=s, c=colour, label=subcategory, alpha=alpha, edgecolor='black', linewidth=1)
-
-                num_data_point = len(x_data)
-                if num_data_point > 1:
-                    if hyperbola:
-
-                        # We need to add a small value to all x data to avoid 1/0
-                        x_epsilon = 5
-                        x_data += x_epsilon
-                        one_over_x = 1 / x_data
-                        try:
-                            poly1d = np.poly1d(np.polyfit(one_over_x, raw_y_data, 1))
-                        except:
-                            x = 0
-                        poly_one_over_x = 1 / np.linspace(x_data_min + x_epsilon, x_data_max + x_epsilon, 300)
-                        poly_y = poly1d(poly_one_over_x)
-                        plt.plot(1/poly_one_over_x - x_epsilon, poly_y, c=colour, linestyle='dashed')
-                    else:
-                        poly1d = np.poly1d(np.polyfit(x_data, raw_y_data, 1))
-                        poly_x = np.linspace(x_data_min, x_data_max, 300)
-                        poly_y = poly1d(poly_x)
-                        plt.plot(poly_x, poly_y, c=colour, linestyle='dashed')
-
-                subcategories_names.append(subcategory)
-                subcategories_indx.append(ind)
-
-            if yaxis_is_frequency:
-                legend = plt.legend(fontsize=10)
-                for legend_handler in legend.legendHandles:
-                    legend_handler._sizes = [50]
-                plt.xlabel(full_labels.get(datapoint_column_name, datapoint_column_name))
-            else:
-                plt.yticks(subcategories_indx, labels=subcategories_names)
-                plt.ylim([subcategories_indx[0] - 1, subcategories_indx[-1] + 1])
-
-            if not yaxis_is_frequency:
-                y_label = 'Preposition'
-            else:
-                y_label = full_labels.get(value_column_name, value_column_name)
-
-            plt.ylabel(y_label)
-
-            plt.title(file_name.replace('_', ' '),
-                      fontdict={'family': 'serif',
-                                'color': 'darkblue',
-                                'weight': 'bold',
-                                'size': 18})
-
-            plt.ylim((-5, y_data_max + 5))
-
-            plt.savefig(file_path)
-            plt.close()
-            print('Saved to ' + file_path)
-
     def add_arguments(self, parser):
         parser.add_argument('--legend', action='store', dest='show_legend', default='both', type=str)
 
@@ -362,7 +47,6 @@ class Command(BaseCommand):
         column_names = ['Preposition', 'Relatum', 'Locatum', 'Distance (b2b)', 'Distance (c2b)', 'Fre']
 
         self.plotter = Plotter(column_names)
-        self.plotter.get_database(files)
 
         for_rels = ['Buckingham Palace', 'Hyde Park', 'Trafalgar Square']
 
@@ -389,16 +73,16 @@ class Command(BaseCommand):
             # self.plot(categories_details, 'Distance (b2b)', 'Fre', img_dir, 'data_for_plotting1-b2b', 'stacked')
             # self.plot(categories_details, 'Distance (b2b)', 'Fre', img_dir, 'data_for_plotting1-b2b', 'stacked-trim')
             # self.plot(categories_details, 'Distance (b2b)', 'Fre', img_dir, 'data_for_plotting1-b2b', 'gigili')
-            # self.plot(categories_details, 'Distance (b2b)', 'Fre', img_dir, 'data_for_plotting1-b2b', 'normal-samesize-hyperbola')
+            self.plot(categories_details, 'Distance (b2b)', 'Fre', img_dir, 'data_for_plotting1-b2b', 'normal-samesize-hyperbola')
             self.plot(categories_details, 'Distance (b2b)', 'Fre', img_dir, 'data_for_plotting1-b2b', 'gigigi-accum-highlight')
             self.plot(categories_details, 'Distance (b2b)', 'Fre', img_dir, 'data_for_plotting1-b2b', 'table-accum')
 
-            categories_details = self.plotter.database.get_categories_details('Preposition', 'Relatum', 'Distance (c2b)', 'Fre')
+            # categories_details = self.plotter.database.get_categories_details('Preposition', 'Relatum', 'Distance (c2b)', 'Fre')
             # self.plot(categories_details,'Distance (c2b)', 'Fre', img_dir, 'data_for_plotting1-c2b', 'gigigi')
             # self.plot(categories_details,'Distance (c2b)', 'Fre', img_dir, 'data_for_plotting1-c2b', 'gigili')
             # self.plot(categories_details,'Distance (c2b)', 'Fre', img_dir, 'data_for_plotting1-c2b', 'normal-samesize')
-            self.plot(categories_details,'Distance (c2b)', 'Fre', img_dir, 'data_for_plotting1-c2b', 'gigigi-accum-highlight')
-            self.plot(categories_details,'Distance (c2b)', 'Fre', img_dir, 'data_for_plotting1-c2b', 'table-accum')
+            # self.plot(categories_details,'Distance (c2b)', 'Fre', img_dir, 'data_for_plotting1-c2b', 'gigigi-accum-highlight')
+            # self.plot(categories_details,'Distance (c2b)', 'Fre', img_dir, 'data_for_plotting1-c2b', 'table-accum')
 
             categories_details = self.plotter.database.get_categories_details('Relatum', 'Preposition', 'Distance (b2b)', 'Fre')
             # self.plot(categories_details, 'Distance (b2b)', 'Fre', img_dir, 'data_for_plotting2-b2b', 'normal-samesize')
@@ -406,9 +90,9 @@ class Command(BaseCommand):
             self.plot(categories_details, 'Distance (b2b)', 'Fre', img_dir, 'data_for_plotting2-b2b', 'gigigi-accum-highlight')
             self.plot(categories_details, 'Distance (b2b)', 'Fre', img_dir, 'data_for_plotting2-b2b', 'table-accum')
 
-            categories_details = self.plotter.database.get_categories_details('Relatum', 'Preposition', 'Distance (c2b)','Fre')
+            # categories_details = self.plotter.database.get_categories_details('Relatum', 'Preposition', 'Distance (c2b)','Fre')
             # self.plot(categories_details, 'Distance (c2b)', 'Fre', img_dir, 'data_for_plotting2-c2b', 'gigigi')
             # self.plot(categories_details, 'Distance (c2b)', 'Fre', img_dir, 'data_for_plotting2-c2b', 'gigigi-accum')
             # self.plot(categories_details, 'Distance (c2b)', 'Fre', img_dir, 'data_for_plotting2-c2b', 'normal-samesize')
-            self.plot(categories_details, 'Distance (c2b)', 'Fre', img_dir, 'data_for_plotting2-c2b', 'gigigi-accum-highlight')
-            self.plot(categories_details, 'Distance (c2b)', 'Fre', img_dir, 'data_for_plotting2-c2b', 'table-accum')
+            # self.plot(categories_details, 'Distance (c2b)', 'Fre', img_dir, 'data_for_plotting2-c2b', 'gigigi-accum-highlight')
+            # self.plot(categories_details, 'Distance (c2b)', 'Fre', img_dir, 'data_for_plotting2-c2b', 'table-accum')

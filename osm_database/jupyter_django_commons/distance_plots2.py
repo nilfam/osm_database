@@ -36,7 +36,7 @@ def detect_point_of_flatting(y_data, threshold, min_threshold=None, max_threshol
     flatting_point_ind = None
     exceeded_previously = False
 
-    for ind in range(len(diff) - 1, 0, -1):
+    for ind in range(len(diff) - 1, -1, -1):
         exceeded_now = diff[ind] < stop_threshold
         if not exceeded_previously and not exceeded_now:
             break
@@ -93,8 +93,8 @@ class Database:
 
             subcategories_data = []
             for subcategory in unique_subcategories:
-                indices = np.where(category_data[:, subcategory_column_ind] == subcategory)
-                df_data = category_data[indices][:, (datapoint_column_ind, value_column_ind)]
+                indices_ = np.where(category_data[:, subcategory_column_ind] == subcategory)
+                df_data = category_data[indices_][:, (datapoint_column_ind, value_column_ind)]
                 df = pd.DataFrame(columns=[datapoint_column_name, value_column_name], data=df_data)
                 subcategories_data.append(dict(df=df, subcategory=subcategory))
 
@@ -328,7 +328,7 @@ class Plotter:
                         flatting_point_y = y_data[flatting_point_ind]
 
                         plt.scatter(x=flatting_point_x, y=flatting_point_y, s=150, c='red')
-                        plt.annotate(str(int(flatting_point_y)),
+                        plt.annotate(str(int(flatting_point_x)),
                                      xy=(flatting_point_x, flatting_point_y),
                                      xytext=(20, 10), textcoords='offset pixels',
                                      horizontalalignment='right',
@@ -530,7 +530,5 @@ class Plotter:
         for file in files:
             full_path = os.path.join(root_dir, 'osm_database', file)
             self.populate_objects_from_excel(full_path, for_rels)
-
-        self.database.finalise()
 
         return self.database
