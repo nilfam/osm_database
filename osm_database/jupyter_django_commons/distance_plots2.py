@@ -17,24 +17,59 @@ root_dir = os.path.join(os.path.sep.join(dir_parts[0:dir_parts.index('osm_databa
 from mpl_toolkits.axes_grid.inset_locator import mark_inset
 
 
+#######################################################################################
+###################################  CONSTANTS  #######################################
+# The numbers are: inset_x0, inset_x1, inset_y0, inset_y1, zoom_x0, zoom_y0, zoom_width
+inset_config = {
+    'Trafalgar Square':  [-10, 200, -10, 110,  300, 100, 400],
+    'Hyde Park':         [-10, 200, -10, 150,  300, 350, 600],
+    'Buckingham Palace': [-10, 200, -10, 200, 1100, 300, 500],
+}
+
+
+cutoff_angle = 5  # Degree below which the angle is considered flat
+
+# 'next point': the angle is between the line between current point and the next point, and the x-axis
+# 'last point': the angle is between the line between current point and the last point, and the x-axis
+angle_based_on = 'last point'
+
+
+full_labels = {
+    'Fre': 'Frequency',
+    'Distance (c2b)': 'Distance from locatum centroid to relatum boundary',
+    'Distance (b2b)': 'Distance from locatum boundary to relatum boundary',
+}
+
+show_plot_title = False
+#######################################################################################
+
+
 def normalise(arr, minval, maxval):
     arr_min = arr.min()
     arr_max = arr.max()
     return (arr - arr_min) / (arr_max) * (maxval - minval) + minval
 
 
-def detect_point_of_flatting(x_data, y_data, threshold, min_threshold=None, max_threshold=None):
-    dx = np.diff(x_data)
-    # dx = x_data[-1] - x_data[:-1]
+def get_angles(x_data, y_data):
+    if angle_based_on == 'next point':
+        dx = np.diff(x_data)
+        dy = np.diff(y_data)
+    else:
+        dx = x_data[-1] - x_data[:-1]
+        dy = y_data[-1] - y_data[:-1]
+
     dx_zero_indx = np.where(dx == 0)
     dx[dx_zero_indx] = 1
 
-    dy = np.diff(y_data)
-    # dy = y_data[-1] - y_data[:-1]
-    slopes = np.true_divide(dy, dx)
-    slopes = np.arctan(slopes) / np.pi * 180
+    angles = np.true_divide(dy, dx)
+    angles = np.arctan(angles) / np.pi * 180
 
-    slopes[dx_zero_indx] = 180
+    angles[dx_zero_indx] = 180
+    return angles
+
+
+def detect_point_of_flatting(x_data, y_data, threshold, min_threshold=None, max_threshold=None):
+    angles = get_angles(x_data, y_data)
 
     if max_threshold is not None:
         threshold = min(max_threshold, threshold)
@@ -45,8 +80,8 @@ def detect_point_of_flatting(x_data, y_data, threshold, min_threshold=None, max_
     flatting_point_ind = None
     still_within_threshold_previously = False
 
-    for ind in range(len(slopes)-1, -1, -1):
-        still_within_threshold_now = slopes[ind] < threshold
+    for ind in range(len(angles)-1, -1, -1):
+        still_within_threshold_now = angles[ind] < threshold
         if not still_within_threshold_previously and not still_within_threshold_now:
             break
         if still_within_threshold_previously and not still_within_threshold_now:
@@ -60,7 +95,7 @@ def detect_point_of_flatting(x_data, y_data, threshold, min_threshold=None, max_
 
 def bbox_from_abs(rect_x0, rect_y0, rect_width, rect_height, ax):
     """
-    Converts absolute axis units to bbox
+    Given a bbox in coordinate units, convert it to a bbox in axis unit
     """
     rect_x1 = rect_x0 + rect_width
     rect_y1 = rect_y0 + rect_height
@@ -125,13 +160,6 @@ class Database:
             categories_details.append(dict(category=category, subcategories=subcategories_data))
 
         return categories_details
-
-
-full_labels = {
-    'Fre': 'Frequency',
-    'Distance (c2b)': 'Distance from locatum centroid to relatum boundary',
-    'Distance (b2b)': 'Distance from locatum boundary to relatum boundary',
-}
 
 
 class Plotter:
@@ -307,11 +335,12 @@ class Plotter:
             plt.xlabel(full_labels.get(datapoint_column_name, datapoint_column_name))
             plt.ylabel(full_labels.get(value_column_name, value_column_name))
 
-            plt.title(file_name.replace('_', ' '),
-                      fontdict={'family': 'serif',
-                                'color': 'darkblue',
-                                'weight': 'bold',
-                                'size': 18})
+            if show_plot_title:
+                plt.title(file_name.replace('_', ' '),
+                          fontdict={'family': 'serif',
+                                    'color': 'darkblue',
+                                    'weight': 'bold',
+                                    'size': 18})
 
         return retval
 
@@ -346,7 +375,7 @@ class Plotter:
                 plt.plot(x_data, y_data, label=subcategory, marker='o')
 
                 if highlight:
-                    flatting_point_ind = detect_point_of_flatting(x_data, y_data, 5)
+                    flatting_point_ind = detect_point_of_flatting(x_data, y_data, cutoff_angle)
                     if flatting_point_ind is not None:
                         flatting_point_x = x_data[flatting_point_ind]
                         flatting_point_y = y_data[flatting_point_ind]
@@ -373,23 +402,10 @@ class Plotter:
             ax1.tick_params('x', length=20, width=2, which='major')
             ax1.tick_params('x', length=10, width=1, which='minor')
 
-            ##############
-            # sub region of the original image
+            ############################################################################################
+            ##################### Plot a sub region of the original image ##############################
 
-            # Good for Buckingham Palace
-            # inset_x0, inset_x1, inset_y0, inset_y1 = -10, 200, -10, 200
-            # zoom_x0, zoom_y0 = 1100, 300
-            # zoom_width = 500
-
-            # Good for Trafalgar Square
-            inset_x0, inset_x1, inset_y0, inset_y1 = -10, 200, -10, 110
-            zoom_x0, zoom_y0 = 300, 100
-            zoom_width = 400
-
-            # Good for Hyde Park
-            inset_x0, inset_x1, inset_y0, inset_y1 = -10, 200, -10, 150
-            zoom_x0, zoom_y0 = 300, 350
-            zoom_width = 600
+            inset_x0, inset_x1, inset_y0, inset_y1, zoom_x0, zoom_y0, zoom_width = inset_config[category]
 
             inset_width = inset_x1 - inset_x0
             inset_height = inset_y1 - inset_y0
@@ -405,13 +421,14 @@ class Plotter:
             # connecting lines between the bbox and the inset axes area
             mark_inset(ax1, axins, loc1=2, loc2=4, fc="none", ec="0.5")
 
-            ##############
+            ############################################################################################
 
-            plt.title(file_name.replace('_', ' '),
-                      fontdict={'family': 'serif',
-                                'color': 'darkblue',
-                                'weight': 'bold',
-                                'size': 18})
+            if show_plot_title:
+                plt.title(file_name.replace('_', ' '),
+                          fontdict={'family': 'serif',
+                                    'color': 'darkblue',
+                                    'weight': 'bold',
+                                    'size': 18})
 
 
         return retval
@@ -433,6 +450,8 @@ class Plotter:
             table_columns_y_data = []
             if accum:
                 table_columns_y_data_accum = []
+
+            table_columns_angle = []
             max_data_length = 0
 
             for ind, subcategory_data in enumerate(subcategories, 1):
@@ -441,6 +460,7 @@ class Plotter:
                 table_headings.append(subcategory + '-Freq')
                 if accum:
                     table_headings.append(subcategory + '-Freq-Accum')
+                table_headings.append(subcategory + '-Angle')
 
                 df = subcategory_data['df']
                 x_data = np.array(df[datapoint_column_name]).astype(np.float)
@@ -452,21 +472,28 @@ class Plotter:
 
                 if accum:
                     y_data_accum = np.add.accumulate(y_data)
+                    angle_data = get_angles(x_data, y_data_accum)
+                else:
+                    angle_data = get_angles(x_data, y_data)
+
+                angle_data = np.concatenate((angle_data, np.zeros((1,))))
 
                 table_columns_x_data.append(x_data)
                 table_columns_y_data.append(y_data)
 
                 if accum:
                     table_columns_y_data_accum.append(y_data_accum)
+
+                table_columns_angle.append(angle_data)
                 max_data_length = max(max_data_length, len(x_data))
 
             df = pd.DataFrame(columns=table_headings)
             for i in range(max_data_length):
                 row = []
                 if accum:
-                    table_columns = zip(table_columns_x_data, table_columns_y_data, table_columns_y_data_accum)
+                    table_columns = zip(table_columns_x_data, table_columns_y_data, table_columns_y_data_accum, table_columns_angle)
                 else:
-                    table_columns = zip(table_columns_x_data, table_columns_y_data)
+                    table_columns = zip(table_columns_x_data, table_columns_y_data, table_columns_angle)
 
                 for columns in table_columns:
                     for column in columns:
@@ -563,11 +590,14 @@ class Plotter:
             else:
                 y_label = full_labels.get(value_column_name, value_column_name)
             plt.ylabel(y_label)
-            plt.title(file_name.replace('_', ' '),
-                      fontdict={'family': 'serif',
-                                'color': 'darkblue',
-                                'weight': 'bold',
-                                'size': 18})
+
+            if show_plot_title:
+                plt.title(file_name.replace('_', ' '),
+                          fontdict={'family': 'serif',
+                                    'color': 'darkblue',
+                                    'weight': 'bold',
+                                    'size': 18})
+
             plt.ylim((-5, y_data_max + 5))
 
         return retval
