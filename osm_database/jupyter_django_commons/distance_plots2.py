@@ -4,13 +4,18 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 from matplotlib.ticker import MultipleLocator
+from matplotlib.transforms import Bbox
 from scipy.interpolate import interp1d
+
+from zoomaxes import ZoomViewAxes
 
 current_dir = os.path.dirname(os.path.abspath(__file__))
 script_name = os.path.split(__file__)[1][0:-3]
 dir_parts = current_dir.split(os.path.sep)
 root_dir = os.path.join(os.path.sep.join(dir_parts[0:dir_parts.index('osm_database')]))
 
+from mpl_toolkits.axes_grid1.inset_locator import zoomed_inset_axes
+from mpl_toolkits.axes_grid.inset_locator import inset_axes, InsetPosition, mark_inset
 
 def normalise(arr, minval, maxval):
     arr_min = arr.min()
@@ -304,9 +309,10 @@ class Plotter:
 
             subcategories = category_details['subcategories']
 
-            fig = plt.figure(figsize=(10, 7))
+            fig, ax1 = plt.subplots(figsize=(10, 7))
+            window_extent = ax1.get_window_extent()
+
             plt.subplots_adjust(bottom=0.1, top=0.9)
-            ax1 = fig.gca()
 
             retval[file_name] = fig
 
@@ -352,6 +358,37 @@ class Plotter:
             ax1.xaxis.set_minor_locator(ml)
             ax1.tick_params('x', length=20, width=2, which='major')
             ax1.tick_params('x', length=10, width=1, which='minor')
+
+            ##############
+
+            # Good for Trafalgar Square and Hyde Park:
+            # window_extent = ax1.get_window_extent()
+            # wh_ratio = window_extent.height / window_extent.width
+            # bbox_height = 0.3
+            # bbox_width = bbox_height * wh_ratio
+            #
+            # axins = ZoomViewAxes(ax1, Bbox.from_bounds(0.5, 0.35, bbox_width, bbox_height), ax1.transAxes)
+            # # sub region of the original image
+            # x1, x2, y1, y2 = -10, 100, 0, 100
+            # axins.set_xlim(x1, x2)
+            # axins.set_ylim(y1, y2)
+
+            # Good for Buckingham Palace
+            wh_ratio = window_extent.height / window_extent.width
+            bbox_height = 0.45
+            bbox_width = bbox_height * wh_ratio
+
+            axins = ZoomViewAxes(ax1, Bbox.from_bounds(0.6, 0.35, bbox_width, bbox_height), ax1.transAxes)
+            # sub region of the original image
+            x1, x2, y1, y2 = -10, 200, -10, 200
+            axins.set_xlim(x1, x2)
+            axins.set_ylim(y1, y2)
+
+            # draw a bbox of the region of the inset axes in the parent axes and
+            # connecting lines between the bbox and the inset axes area
+            mark_inset(ax1, axins, loc1=2, loc2=4, fc="none", ec="0.5")
+
+            ##############
 
             plt.title(file_name.replace('_', ' '),
                       fontdict={'family': 'serif',
