@@ -14,8 +14,8 @@ script_name = os.path.split(__file__)[1][0:-3]
 dir_parts = current_dir.split(os.path.sep)
 root_dir = os.path.join(os.path.sep.join(dir_parts[0:dir_parts.index('osm_database')]))
 
-from mpl_toolkits.axes_grid1.inset_locator import zoomed_inset_axes
-from mpl_toolkits.axes_grid.inset_locator import inset_axes, InsetPosition, mark_inset
+from mpl_toolkits.axes_grid.inset_locator import mark_inset
+
 
 def normalise(arr, minval, maxval):
     arr_min = arr.min()
@@ -56,6 +56,21 @@ def detect_point_of_flatting(x_data, y_data, threshold, min_threshold=None, max_
             still_within_threshold_previously = still_within_threshold_now
 
     return flatting_point_ind
+
+
+def bbox_from_abs(rect_x0, rect_y0, rect_width, rect_height, ax):
+    """
+    Converts absolute axis units to bbox
+    """
+    rect_x1 = rect_x0 + rect_width
+    rect_y1 = rect_y0 + rect_height
+
+    axis_to_data = ax.transAxes + ax.transData.inverted()
+    data_to_axis = axis_to_data.inverted()
+    bbox_x0, bbox_y0 = data_to_axis.transform((rect_x0, rect_y0))
+    bbox_x1, bbox_y1 = data_to_axis.transform((rect_x1, rect_y1))
+
+    return Bbox.from_bounds(bbox_x0, bbox_y0, bbox_x1 - bbox_x0, bbox_y1 - bbox_y0)
 
 
 class Database:
@@ -310,7 +325,6 @@ class Plotter:
             subcategories = category_details['subcategories']
 
             fig, ax1 = plt.subplots(figsize=(10, 7))
-            window_extent = ax1.get_window_extent()
 
             plt.subplots_adjust(bottom=0.1, top=0.9)
 
@@ -360,29 +374,32 @@ class Plotter:
             ax1.tick_params('x', length=10, width=1, which='minor')
 
             ##############
-
-            # Good for Trafalgar Square and Hyde Park:
-            # window_extent = ax1.get_window_extent()
-            # wh_ratio = window_extent.height / window_extent.width
-            # bbox_height = 0.3
-            # bbox_width = bbox_height * wh_ratio
-            #
-            # axins = ZoomViewAxes(ax1, Bbox.from_bounds(0.5, 0.35, bbox_width, bbox_height), ax1.transAxes)
-            # # sub region of the original image
-            # x1, x2, y1, y2 = -10, 100, 0, 100
-            # axins.set_xlim(x1, x2)
-            # axins.set_ylim(y1, y2)
+            # sub region of the original image
 
             # Good for Buckingham Palace
-            wh_ratio = window_extent.height / window_extent.width
-            bbox_height = 0.45
-            bbox_width = bbox_height * wh_ratio
+            # inset_x0, inset_x1, inset_y0, inset_y1 = -10, 200, -10, 200
+            # zoom_x0, zoom_y0 = 1100, 300
+            # zoom_width = 500
 
-            axins = ZoomViewAxes(ax1, Bbox.from_bounds(0.6, 0.35, bbox_width, bbox_height), ax1.transAxes)
-            # sub region of the original image
-            x1, x2, y1, y2 = -10, 200, -10, 200
-            axins.set_xlim(x1, x2)
-            axins.set_ylim(y1, y2)
+            # Good for Trafalgar Square
+            inset_x0, inset_x1, inset_y0, inset_y1 = -10, 200, -10, 110
+            zoom_x0, zoom_y0 = 300, 100
+            zoom_width = 400
+
+            # Good for Hyde Park
+            inset_x0, inset_x1, inset_y0, inset_y1 = -10, 200, -10, 150
+            zoom_x0, zoom_y0 = 300, 350
+            zoom_width = 600
+
+            inset_width = inset_x1 - inset_x0
+            inset_height = inset_y1 - inset_y0
+            zoom_height = zoom_width * (inset_height / inset_width)
+            zoom_bbox = bbox_from_abs(zoom_x0, zoom_y0, zoom_width, zoom_height, ax1)
+
+            axins = ZoomViewAxes(ax1, zoom_bbox, ax1.transAxes)
+
+            axins.set_xlim(inset_x0, inset_x1)
+            axins.set_ylim(inset_y0, inset_y1)
 
             # draw a bbox of the region of the inset axes in the parent axes and
             # connecting lines between the bbox and the inset axes area
