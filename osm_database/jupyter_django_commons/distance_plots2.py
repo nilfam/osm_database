@@ -379,13 +379,15 @@ class Plotter:
                     if flatting_point_ind is not None:
                         flatting_point_x = x_data[flatting_point_ind]
                         flatting_point_y = y_data[flatting_point_ind]
-
                         plt.scatter(x=flatting_point_x, y=flatting_point_y, s=150, c='red')
-                        plt.annotate(str(int(flatting_point_x)),
-                                     xy=(flatting_point_x, flatting_point_y),
-                                     xytext=(20, 10), textcoords='offset pixels',
-                                     horizontalalignment='right',
-                                     verticalalignment='bottom')
+                        plt.text(flatting_point_x + 20, flatting_point_y + 10, str(int(flatting_point_x)))
+
+                        # plt.annotate(str(int(flatting_point_x)),
+                        #              xy=(flatting_point_x, flatting_point_y),
+                        #              xytext=(20, 10), textcoords='offset pixels',
+                        #              horizontalalignment='right',
+                        #              verticalalignment='bottom',
+                        #              arrowprops=dict(arrowstyle="-|>"))
 
             legend = plt.legend(fontsize=10)
             if not self.legend_on:
@@ -412,7 +414,9 @@ class Plotter:
             zoom_height = zoom_width * (inset_height / inset_width)
             zoom_bbox = bbox_from_abs(zoom_x0, zoom_y0, zoom_width, zoom_height, ax1)
 
-            axins = ZoomViewAxes(ax1, zoom_bbox, ax1.transAxes)
+            zoom_ratio = zoom_width / (inset_x1 - inset_x0)
+
+            axins = ZoomViewAxes(zoom_ratio, ax1, zoom_bbox, ax1.transAxes)
 
             axins.set_xlim(inset_x0, inset_x1)
             axins.set_ylim(inset_y0, inset_y1)

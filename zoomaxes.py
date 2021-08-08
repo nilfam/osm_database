@@ -1,6 +1,9 @@
+from matplotlib.collections import PathCollection
+from matplotlib.lines import Line2D
 from matplotlib.path import Path
 from matplotlib.axes import Axes
 from matplotlib.axes._axes import _make_inset_locator
+from matplotlib.text import Text
 from matplotlib.transforms import Bbox, Transform, IdentityTransform, Affine2D
 from matplotlib.backend_bases import RendererBase
 import matplotlib._image as _image
@@ -173,7 +176,7 @@ class ZoomViewAxes(Axes):
     A zoom axes which automatically displays all of the elements it is currently zoomed in on. Does not require
     Artists to be plotted twice.
     """
-    def __init__(self, axes_of_zoom: Axes, rect: Bbox, transform = None, zorder = 5, **kwargs):
+    def __init__(self, zoom_ratio, axes_of_zoom: Axes, rect: Bbox, transform = None, zorder = 5, **kwargs):
         """
         Construct a new zoom axes.
 
@@ -194,6 +197,7 @@ class ZoomViewAxes(Axes):
         super().__init__(axes_of_zoom.figure, bb.bounds, zorder=zorder, **kwargs)
 
         self.__zoom_axes = axes_of_zoom
+        self.zoom_ratio = zoom_ratio
         self.set_axes_locator(inset_loc)
 
         axes_of_zoom.add_child_axes(self)
@@ -212,6 +216,14 @@ class ZoomViewAxes(Axes):
             *self.__zoom_axes.artists,
             *self.__zoom_axes.images
         ]
+
+        for axes_child in axes_children:
+            if isinstance(axes_child, Line2D):
+                axes_child.set_markersize(axes_child.get_markersize() / self.zoom_ratio)
+            if isinstance(axes_child, Text):
+                axes_child.set_size(axes_child.get_size() / self.zoom_ratio)
+            if isinstance(axes_child, PathCollection):
+                axes_child.set_sizes(axes_child.get_sizes() / self.zoom_ratio ** 2)
 
         img_boxes = []
         # We need to temporarily disable the clip boxes of all of the images, in order to allow us to continue
