@@ -13,6 +13,13 @@ dir_parts = current_dir.split(os.path.sep)
 cache_dir = os.path.join(os.path.sep.join(dir_parts[0:dir_parts.index('management')]), 'cache', script_name)
 
 
+full_labels = {
+    'Fre': 'Cumulative frequency',
+    'Distance (c2b)': 'Distance from locatum centroid to relatum boundary',
+    'Distance (b2b)': 'Distance from locatum boundary to relatum boundary',
+}
+
+
 class Command(BaseCommand):
 
     def plot(self, categories_details, datapoint_column_name, value_column_name, img_dir, image_name_prefix, type='gigigi'):
@@ -46,7 +53,7 @@ class Command(BaseCommand):
         ]
         column_names = ['Preposition', 'Relatum', 'Locatum', 'Distance (b2b)', 'Distance (c2b)', 'Fre']
 
-        self.plotter = Plotter(column_names)
+        self.plotter = Plotter(column_names, full_labels)
 
         for_rels = ['Buckingham Palace', 'Hyde Park', 'Trafalgar Square']
 

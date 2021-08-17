@@ -17,7 +17,7 @@ cache_dir = os.path.join(os.path.sep.join(dir_parts[0:dir_parts.index('managemen
 
 
 full_labels = {
-    'AdjustedFreq': 'Frequency',
+    'AdjustedFreq': 'Adjusted frequency',
     'Distance (c2b)': 'Distance from locatum centroid to relatum boundary',
     'Distance (b2b)': 'Distance from locatum boundary to relatum boundary',
 }
@@ -78,7 +78,7 @@ class Command(BaseCommand):
         ]
         column_names = ['Preposition', 'Relatum', 'Locatum', 'Distance (b2b)', 'Distance (c2b)', 'AdjustedFreq']
 
-        self.plotter = Plotter(column_names)
+        self.plotter = Plotter(column_names, full_labels)
 
         for_rels = ['Buckingham Palace', 'Hyde Park', 'Trafalgar Square']
 

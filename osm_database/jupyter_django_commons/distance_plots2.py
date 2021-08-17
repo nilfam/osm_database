@@ -24,6 +24,7 @@ inset_config = {
     'Trafalgar Square':  [-10, 200, -10, 110,  700, 100, 400],
     'Hyde Park':         [-10, 200, -10, 150,  400, 350, 600],
     'Buckingham Palace': [-10, 200, -10, 200, 750, 330, 400],
+    'All':               [-10, 200, -10, 350, 710, 380, 400],
 }
 
 
@@ -36,14 +37,9 @@ curoff_method_if_none_exceeds = 'mean'
 # 'last point': the angle is between the line between current point and the last point, and the x-axis
 angle_based_on = 'next point'
 
-
-full_labels = {
-    'Fre': 'Cumulative frequency',
-    'Distance (c2b)': 'Distance from locatum centroid to relatum boundary',
-    'Distance (b2b)': 'Distance from locatum boundary to relatum boundary',
-}
-
 show_plot_title = False
+
+use_global_xticks = True
 
 global_xticks = np.arange(-100, 1201, 100)
 #######################################################################################
@@ -173,8 +169,9 @@ class Database:
 
 
 class Plotter:
-    def __init__(self, column_names):
+    def __init__(self, column_names, full_labels):
         self.database = Database(column_names)
+        self.full_labels = full_labels
 
     def merge_categories(self, categories_details):
         all_subcategories = {}
@@ -342,8 +339,8 @@ class Plotter:
 
             plt.legend(fontsize=10)
 
-            plt.xlabel(full_labels.get(datapoint_column_name, datapoint_column_name))
-            plt.ylabel(full_labels.get(value_column_name, value_column_name))
+            plt.xlabel(self.full_labels.get(datapoint_column_name, datapoint_column_name))
+            plt.ylabel(self.full_labels.get(value_column_name, value_column_name))
 
             if show_plot_title:
                 plt.title(file_name.replace('_', ' '),
@@ -403,12 +400,14 @@ class Plotter:
             if not self.legend_on:
                 legend.remove()
 
-            plt.xlabel(full_labels.get(datapoint_column_name, datapoint_column_name))
-            plt.ylabel(full_labels.get(value_column_name, value_column_name))
+            plt.xlabel(self.full_labels.get(datapoint_column_name, datapoint_column_name))
+            plt.ylabel(self.full_labels.get(value_column_name, value_column_name))
 
-            # xticks = plt.xticks()[0]
-            # new_xticks = np.arange(max(0, min(xticks)) - 100, max(xticks), 100)
-            new_xticks = global_xticks
+            if use_global_xticks:
+                new_xticks = global_xticks
+            else:
+                xticks = plt.xticks()[0]
+                new_xticks = np.arange(max(0, min(xticks)) - 100, max(xticks), 100)
 
             plt.xticks(new_xticks, rotation=90, ha='center')
             ml = MultipleLocator(20)
@@ -598,14 +597,14 @@ class Plotter:
                 legend = plt.legend(fontsize=10)
                 for legend_handler in legend.legendHandles:
                     legend_handler._sizes = [50]
-                plt.xlabel(full_labels.get(datapoint_column_name, datapoint_column_name))
+                plt.xlabel(self.full_labels.get(datapoint_column_name, datapoint_column_name))
             else:
                 plt.yticks(subcategories_indx, labels=subcategories_names)
                 plt.ylim([subcategories_indx[0] - 1, subcategories_indx[-1] + 1])
             if not yaxis_is_frequency:
                 y_label = 'Preposition'
             else:
-                y_label = full_labels.get(value_column_name, value_column_name)
+                y_label = self.full_labels.get(value_column_name, value_column_name)
             plt.ylabel(y_label)
 
             if show_plot_title:
@@ -616,6 +615,12 @@ class Plotter:
                                     'size': 18})
 
             plt.ylim((-5, y_data_max + 5))
+            if use_global_xticks:
+                new_xticks = global_xticks
+            else:
+                new_xticks = plt.xticks()[0]
+
+            plt.xticks(new_xticks)
 
         return retval
 
