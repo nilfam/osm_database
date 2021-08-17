@@ -21,26 +21,31 @@ from mpl_toolkits.axes_grid.inset_locator import mark_inset
 ###################################  CONSTANTS  #######################################
 # The numbers are: inset_x0, inset_x1, inset_y0, inset_y1, zoom_x0, zoom_y0, zoom_width
 inset_config = {
-    'Trafalgar Square':  [-10, 200, -10, 110,  300, 100, 400],
-    'Hyde Park':         [-10, 200, -10, 150,  300, 350, 600],
-    'Buckingham Palace': [-10, 200, -10, 200, 1100, 300, 500],
+    'Trafalgar Square':  [-10, 200, -10, 110,  700, 100, 400],
+    'Hyde Park':         [-10, 200, -10, 150,  400, 350, 600],
+    'Buckingham Palace': [-10, 200, -10, 200, 750, 330, 400],
 }
 
 
 cutoff_angle = 5  # Degree below which the angle is considered flat
 
+# In case none of the angle exeeds the cutoff value, use 'mean'/'median' of all angles, or 'none'
+curoff_method_if_none_exceeds = 'mean'
+
 # 'next point': the angle is between the line between current point and the next point, and the x-axis
 # 'last point': the angle is between the line between current point and the last point, and the x-axis
-angle_based_on = 'last point'
+angle_based_on = 'next point'
 
 
 full_labels = {
-    'Fre': 'Frequency',
+    'Fre': 'Cumulative frequency',
     'Distance (c2b)': 'Distance from locatum centroid to relatum boundary',
     'Distance (b2b)': 'Distance from locatum boundary to relatum boundary',
 }
 
 show_plot_title = False
+
+global_xticks = np.arange(-100, 1201, 100)
 #######################################################################################
 
 
@@ -68,14 +73,19 @@ def get_angles(x_data, y_data):
     return angles
 
 
-def detect_point_of_flatting(x_data, y_data, threshold, min_threshold=None, max_threshold=None):
+def detect_point_of_flatting(x_data, y_data, threshold):
+    if len(x_data) < 2:
+        return None
+
     angles = get_angles(x_data, y_data)
 
-    if max_threshold is not None:
-        threshold = min(max_threshold, threshold)
-
-    if min_threshold is not None:
-        threshold = max(threshold, min_threshold)
+    if angles.max() < threshold:
+        if curoff_method_if_none_exceeds == 'mean':
+            threshold = np.mean(angles)
+        elif curoff_method_if_none_exceeds == 'median':
+            threshold = np.median(angles)
+        else:
+            pass
 
     flatting_point_ind = None
     still_within_threshold_previously = False
@@ -396,8 +406,10 @@ class Plotter:
             plt.xlabel(full_labels.get(datapoint_column_name, datapoint_column_name))
             plt.ylabel(full_labels.get(value_column_name, value_column_name))
 
-            xticks = plt.xticks()[0]
-            new_xticks = np.arange(max(0, min(xticks)) - 100, max(xticks), 100)
+            # xticks = plt.xticks()[0]
+            # new_xticks = np.arange(max(0, min(xticks)) - 100, max(xticks), 100)
+            new_xticks = global_xticks
+
             plt.xticks(new_xticks, rotation=90, ha='center')
             ml = MultipleLocator(20)
             ax1.xaxis.set_minor_locator(ml)
@@ -407,23 +419,24 @@ class Plotter:
             ############################################################################################
             ##################### Plot a sub region of the original image ##############################
 
-            inset_x0, inset_x1, inset_y0, inset_y1, zoom_x0, zoom_y0, zoom_width = inset_config[category]
+            if category in inset_config:
+                inset_x0, inset_x1, inset_y0, inset_y1, zoom_x0, zoom_y0, zoom_width = inset_config[category]
 
-            inset_width = inset_x1 - inset_x0
-            inset_height = inset_y1 - inset_y0
-            zoom_height = zoom_width * (inset_height / inset_width)
-            zoom_bbox = bbox_from_abs(zoom_x0, zoom_y0, zoom_width, zoom_height, ax1)
+                inset_width = inset_x1 - inset_x0
+                inset_height = inset_y1 - inset_y0
+                zoom_height = zoom_width * (inset_height / inset_width)
+                zoom_bbox = bbox_from_abs(zoom_x0, zoom_y0, zoom_width, zoom_height, ax1)
 
-            zoom_ratio = zoom_width / (inset_x1 - inset_x0)
+                zoom_ratio = zoom_width / (inset_x1 - inset_x0)
 
-            axins = ZoomViewAxes(zoom_ratio, ax1, zoom_bbox, ax1.transAxes)
+                axins = ZoomViewAxes(zoom_ratio, ax1, zoom_bbox, ax1.transAxes)
 
-            axins.set_xlim(inset_x0, inset_x1)
-            axins.set_ylim(inset_y0, inset_y1)
+                axins.set_xlim(inset_x0, inset_x1)
+                axins.set_ylim(inset_y0, inset_y1)
 
-            # draw a bbox of the region of the inset axes in the parent axes and
-            # connecting lines between the bbox and the inset axes area
-            mark_inset(ax1, axins, loc1=2, loc2=4, fc="none", ec="0.5")
+                # draw a bbox of the region of the inset axes in the parent axes and
+                # connecting lines between the bbox and the inset axes area
+                mark_inset(ax1, axins, loc1=2, loc2=4, fc="none", ec="0.5")
 
             ############################################################################################
 
