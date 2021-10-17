@@ -14,6 +14,10 @@ os.environ['PYTHONPATH'] = BASE_DIR
 SITE_ID = 1
 SECRET_KEY = envconf['secret_key']
 
+import xlrd
+xlrd.xlsx.ensure_elementtree_imported(False, None)
+xlrd.xlsx.Element_has_iter = True
+
 
 def base_dir_join(*args):
     return os.path.join(BASE_DIR, *args)

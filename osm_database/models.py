@@ -87,7 +87,8 @@ class MultiPolygon(models.Model):
 
 
 class OsmEntity(models.Model):
-    osm_id = models.BigIntegerField(null=False, blank=False, unique=False, primary_key=True)
+    id = models.AutoField(primary_key=True)
+    osm_id = models.BigIntegerField(null=False, blank=False, unique=False)
     osm_type = models.CharField(max_length=255)
     type = models.CharField(max_length=255)
     category = models.CharField(max_length=255)
