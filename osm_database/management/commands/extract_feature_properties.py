@@ -12,6 +12,9 @@ from nltk.corpus import wordnet
 from openpyxl import load_workbook
 from progress.bar import Bar
 from urllib3.exceptions import InsecureRequestWarning
+import xlrd
+xlrd.xlsx.ensure_elementtree_imported(False, None)
+xlrd.xlsx.Element_has_iter = True
 
 warnings.filterwarnings("ignore", category=InsecureRequestWarning)
 
@@ -177,9 +180,8 @@ class Command(BaseCommand):
             name_spaced = re.sub("([a-z])([A-Z])", "\g<1> \g<2>", name)
             wordnet_feature_dict[name_spaced.lower()] = feature
 
-        df = pd.read_excel(file, sheet_name=sheet_name)
+        df = pd.read_excel(file, sheet_name=sheet_name, keep_default_na=False)
 
-        extracted = {}
         core_features_all = {}
         core_features_to_column = {}
 
@@ -193,7 +195,9 @@ class Command(BaseCommand):
         bar = Bar('Reading excel file...', max=df.shape[0])
         for index, row in df.iterrows():
             relatum_type = row['TYPE']
-            if relatum_type in extracted:
+            if relatum_type == '':
+                features, sims = None, None
+            elif relatum_type in extracted:
                 features, sims = extracted[relatum_type]
             else:
                 features, sims = find_best_match(relatum_type, wordnet_feature_dict)
@@ -219,7 +223,10 @@ class Command(BaseCommand):
         bar = Bar('Extracting features', max=df.shape[0])
         for index, row in df.iterrows():
             relatum_type = row['TYPE']
-            features, scores = extracted[relatum_type]
+            if relatum_type == '':
+                features, scores = None, None
+            else:
+                features, scores = extracted[relatum_type]
             row = [relatum_type, '', 0, '', 0, '', 0] + [0] * len(core_features_all)
             if features is None:
                 row[1] = 'NotFound'
