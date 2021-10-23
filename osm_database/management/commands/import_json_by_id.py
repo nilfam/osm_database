@@ -42,9 +42,17 @@ class Command(BaseCommand):
         with open(filename, 'r') as f:
             entity = json.load(f, parse_float=Decimal)
 
+        osm_type = entity.get('osm_type', None)
+        if osm_type == 'N':
+            osm_type = 'node'
+        elif osm_type == 'W':
+            osm_type = 'way'
+        elif osm_type == 'R':
+            osm_type = 'relation'
+
         entity_obj = OsmEntity()
         entity_obj.osm_id = entity.get('osm_id', None)
-        entity_obj.osm_type = entity.get('osm_type', None)
+        entity_obj.osm_type = osm_type
         if entity_obj.osm_id is None:
             warning("No osm_id found in {}".format(filename))
             return
@@ -64,7 +72,7 @@ class Command(BaseCommand):
         entity_obj.lat = centroid[1]
 
         entity_obj.place_id = entity.get('place_id', None)
-        entity_obj.osm_type = entity.get('osm_type', None)
+        entity_obj.osm_type = osm_type
         entity_obj.type = entity.get('type', None)
         entity_obj.category = entity.get('category', None)
         display_name = entity.get('localname', None)
