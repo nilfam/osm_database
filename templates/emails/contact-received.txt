@@ -1,8 +1,8 @@
 {% load staticfiles %}
 {% load custom_tags %}
 Hi,
-"{{ name }} <{{ email }}>" just contacted Koe with the following message:
+"{{ name }} <{{ email }}>" just contacted Infocare with the following message:
 {{ message }}
 
 Best regards,
-The Koe project
+The Infocare project

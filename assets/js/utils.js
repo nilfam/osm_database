@@ -4,10 +4,6 @@ require('bootstrap-datepicker');
 require('jquery.browser');
 require('jquery-getscrollbarwidth');
 require('devtools-detect');
-// const nj = require('numjs');
-// const math = require('mathjs');
-// const euclidean = require( 'compute-euclidean-distance');
-// const kldivergence = math.kldivergence;
 
 const JSZip = require('jszip/dist/jszip.min.js');
 const filesaver = require('file-saver/dist/FileSaver.min.js');

@@ -3,8 +3,7 @@ require('slickgrid/plugins/slick.autotooltips');
 require('slickgrid/plugins/slick.headermenu');
 
 import {postRequest} from './ajax-handler';
-import {queryAndPlayAudio} from './audio-handler';
-import {isNull, getCache, setCache, deepCopy, getUrl} from './utils';
+import {isNull, getCache, setCache, deepCopy} from './utils';
 import {
     appendSlickGridData,
     renderSlickGrid,
@@ -83,20 +82,6 @@ const selectTextForCopy = function (e, args) {
 };
 
 
-const playAudio = function (e, args) {
-    let target = args.e.target;
-    let img = $(target).closest('.has-image').find('img');
-    let segId = img.attr('seg-id');
-    if (segId) {
-        let args_ = {
-            url: getUrl('send-request', 'koe/get-segment-audio-data'),
-            cacheKey: segId,
-            postData: {'segment-id': segId}
-        };
-        queryAndPlayAudio(args_);
-    }
-};
-
 
 export class FlexibleGrid {
 
@@ -124,7 +109,7 @@ export class FlexibleGrid {
         this.eventNotifier = $(document.createElement('div'));
         this.previousRowCacheName = this.gridType + 'previousRows';
         this.defaultHandlers = {
-            click: [toggleCheckBoxAndRadio, selectTextForCopy, playAudio]
+            click: [toggleCheckBoxAndRadio, selectTextForCopy]
         };
         setCache('grids', this.gridType, this);
     }
@@ -319,9 +304,11 @@ export class FlexibleGrid {
                     itemSimplified[attr] = newValue;
                     itemSimplified[oldAttr] = item[oldAttr] || null;
 
-                    let selectableOptions = selectableColumns[attr];
-                    if (newValue && selectableOptions) {
-                        selectableOptions[newValue] = (selectableOptions[newValue] || 0) + 1;
+                    if (selectableColumns !== undefined) {
+                        let selectableOptions = selectableColumns[attr];
+                        if (newValue && selectableOptions) {
+                            selectableOptions[newValue] = (selectableOptions[newValue] || 0) + 1;
+                        }
                     }
                 }
             }

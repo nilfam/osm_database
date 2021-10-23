@@ -5,7 +5,6 @@ html, body {
   width: 100%;
   margin: 0;
   font-family: 'Oxygen', sans-serif;
-  display: flex;
   font-weight: 500;
   background-color: white;
 }
@@ -449,14 +448,14 @@ body.loading #loading-spinner-modal {
 
 #contact-us-content {
   max-width: 500px;
-  #koe-logo {
+  #infocare-logo {
     height: 70px;
-    #koe-logo-left {
+    #infocare-logo-left {
       img {
         height: 70px;
       }
     }
-    #koe-logo-right {
+    #infocare-logo-right {
       position: absolute;
       text-align: right;
       bottom: 0;

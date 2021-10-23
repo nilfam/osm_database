@@ -1,0 +1,49 @@
+@import "../variables";
+@import "../../../node_modules/bootswatch/simplex/_variables.scss";
+
+$navbar-height: 42px;
+
+#map {
+  height: calc(100vh - #{$navbar-height});
+  width: 100%;
+  margin-top: $navbar-height;
+}
+
+#controller {
+  height: $navbar-height;
+  width: 100%;
+  margin-bottom: 0 !important;
+  border-radius: 0;
+}
+
+.ui-state-active, .ui-widget-content .ui-state-active {
+  background: $brand-primary;
+  border: 1px solid $brand-primary;
+  color: white;
+}
+
+
+.ui-menu-item-wrapper {
+  padding: 10px 15px;
+}
+
+.ui-widget {
+  &.ui-widget-content {
+    border: 1px solid $brand-primary !important;
+    background: white;
+    width: 380px !important;
+  }
+}
+
+.ui-helper-hidden-accessible {
+  display: none;
+}
+
+.ui-autocomplete {
+  z-index: 9999 !important;
+  list-style: none;
+  padding-left: 0;
+  top: $navbar-height;
+  max-height: 200px;
+  overflow: auto;
+}

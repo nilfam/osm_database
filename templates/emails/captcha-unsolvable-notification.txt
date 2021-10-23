@@ -1,8 +1,0 @@
-{% load staticfiles %}
-{% load custom_tags %}
-
-Hi azizam,
-
-The capcha has been unsolvable for more than 5 times
-
-Love you

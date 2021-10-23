@@ -3,7 +3,7 @@
 Hi, {{ user }}
 
 
-Unfortunately, your Koe job has failed. Details follow:
+Unfortunately, your Infocare job has failed. Details follow:
 {% if dm %}
     Job type: Extract feature measurements (Data matrix).
     Created at: {{ dm.task.created }}
@@ -46,4 +46,4 @@ Unfortunately, your Koe job has failed. Details follow:
 Reason for failure: {{ message }}
 
 Best regards,
-The Koe project
+The Infocare project

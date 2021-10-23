@@ -25,6 +25,7 @@
         "bootstrap-datepicker": "^1.6.4",
         "bootstrap-loader": "^1.2.1",
         "bootstrap-sass": "3.3.7",
+        "bootstrap-select": "^1.13.18",
         "bootstrap-slider": "^9.7.2",
         "bootswatch": "^3.3.7",
         "classnames": "^2.2.5",
@@ -83,6 +84,7 @@
         "webpack": "^1.15.0",
         "webpack-bundle-tracker": "0.0.93",
         "webpack-dev-server": "^1.16.2",
+        "wicket": "^1.3.8",
         "yamljs": "^0.3.0"
     },
     "devDependencies": {

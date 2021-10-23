@@ -17,7 +17,7 @@ Promise.config({
  */
 window.Promise = Promise;
 
-import {isNull, createCsv, downloadBlob, getUrl, getGetParams, getCache, logError, uuid4, toJSONLocal} from './utils';
+import {isNull, createCsv, downloadBlob, getGetParams, getCache, logError, uuid4, toJSONLocal} from './utils';
 import {initSidebar} from './sidebar';
 require('no-going-back');
 
@@ -49,7 +49,6 @@ const commonElements = {
     argDict
 };
 
-
 /**
  * If user uses keyboard shortcut to open the modal, restore the element that was focused before the modal was opened
  */
@@ -79,6 +78,28 @@ function viewPortChangeHandler() {
         go(0, window.innerHeight);
     });
 }
+
+/**
+ * Toogle checkbox at the row where the mouse is currently highlighting.
+ */
+const toggleSelectHighlightedRow = function (e) {
+    let gridEl = $(e.path[0]).closest('.has-grid');
+    if (gridEl.length > 0) {
+        let grid = getCache('grids', gridEl.attr('id'));
+        let currentMouseEvent = grid.currentMouseEvent;
+        let selectedRow = grid.getSelectedRows().rows;
+        let row = currentMouseEvent.row;
+        let index = selectedRow.indexOf(row);
+        if (index == -1) {
+            selectedRow.push(row);
+        }
+        else {
+            selectedRow.splice(index, 1);
+        }
+        grid.mainGrid.setSelectedRows(selectedRow);
+    }
+};
+
 
 /**
  * Deselect all rows including rows hidden by the filter
@@ -141,11 +162,24 @@ const jumpNext = function (e, type) {
 };
 
 
+const initKeyboardShortcuts = function () {
+    keyboardJS.bind(['shift + space'], toggleSelectHighlightedRow);
+    keyboardJS.bind(['ctrl + `'], deselectAll);
+    keyboardJS.bind(['shift + mod + down', 'ctrl + down', 'mod + down', 'ctrl + shift + down'], function (e) {
+        jumpNext(e, 'down');
+    });
+    keyboardJS.bind(['shift + mod + up', 'ctrl + up', 'mod + up', 'ctrl + shift + up'], function (e) {
+        jumpNext(e, 'up');
+    });
+};
+
+
 /**
  * Put everything you need to run before the page has been loaded here
  * @private
  */
 const _preRun = function () {
+    initKeyboardShortcuts();
     restoreModalAfterClosing();
     subMenuOpenRight();
     initChangeArgSelections();
@@ -306,7 +340,7 @@ const _postRun = function () {
 
         let d = new Date();
         let dateString = toJSONLocal(d);
-        let filename = `koe-${gridType}-${dateString}.csv`;
+        let filename = `infocare-${gridType}-${dateString}.csv`;
         let blob = new Blob([csvContent], {type: 'text/csv;charset=utf-8;'});
         downloadBlob(blob, filename);
     });
@@ -358,7 +392,7 @@ window.open = function (urlToOpen) {
     }
     catch (e) {
         let errMsg = `
-            <p>Koe was prevented from opening a new window to <a href="${urlToOpen}">${urlToOpen}</a> by your browser.</p>
+            <p>Infocare was prevented from opening a new window to <a href="${urlToOpen}">${urlToOpen}</a> by your browser.</p>
             <p>Please whitelist this website in <strong>Pop-ups and Redirects</strong> settings.</p>`;
         showErrorDialog(errMsg);
     }
@@ -377,8 +411,9 @@ $(document).ready(function () {
     $('[data-toggle="tooltip"]').tooltip();
 
     let pageName = location.pathname;
+
     if (pageName === '/') {
-        page = require('home-page');
+        page = require('prototype.js');
     }
 
     let runPage = function () {

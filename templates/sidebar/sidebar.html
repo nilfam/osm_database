@@ -5,7 +5,7 @@
 <nav id="sidebar-wrapper" page="{{ page }}">
     <div id="sidebar-content">
         <div id="sidebar-brand">
-            <a href="/">声KOE</a>
+            <a href="/">INFOCARE</a>
             <i id="menu-closer" class="fa fa-times pull-right siderbar-toggler" aria-hidden="true"></i>
         </div>
 
@@ -27,123 +27,27 @@
         <div id="sidebar-menu" page="{{ page }}">
             <ul>
                 <li class="menu-section">
-                    <span>Workflow</span>
-                    <div class="menu-item" page="dashboard">
-                        <a href="{% url 'dashboard' %}">
-                            <span>Manage your database</span>
+                    <div class="menu-item" page="child-primary-addresses">
+                        <a href="{% url 'child-primary-addresses' %}">
+                            <span>Children primary addresses</span>
                         </a>
                     </div>
-                    {% if db_assignment.can_add_files %}
-                    <div class="menu-item" page="song-partition">
-                        <a class="appendable" href="{% url 'song-partition' %}">
-                            <span>Upload & split raw recordings</span>
+                    <div class="menu-item" page="child-secondary-addresses">
+                        <a href="{% url 'child-secondary-addresses' %}">
+                            <span>Children secondary addresses</span>
                         </a>
                     </div>
-                    <div class="menu-item" page="">
-                        <a href="{% url 'songs' %}?__action=upload">
-                            <span>Upload songs</span>
+                    <div class="menu-item" page="home-addresses">
+                        <a href="{% url 'home-addresses' %}">
+                            <span>Home addresses</span>
                         </a>
                     </div>
-                    {% endif %}
-
-                    <div class="menu-item" page="songs">
-                        <a class="appendable" href="{% url 'songs' %}">
-                            <span>View all songs</span>
-                        </a>
-                    </div>
-
-                    <div class="menu-item" page="segmentation">
-                        <a href="#" data-toggle="modal" data-target="#go-to-songs-modal">
-                            <span>Segment songs into units</span>
-                        </a>
-                    </div>
-
-                    <div class="menu-item-expandable">
-                        <a href="#">
-                            <span>Extract features and compare</span>
-                        </a>
-                        <div class="menu-submenu">
-                            <ul>
-                                <li page="feature-extraction">
-                                    <a href="{% url 'feature-extraction' %}">
-                                        <span>Extract unit features</span>
-                                    </a>
-                                </li>
-                                <li page="ordination-extraction">
-                                    <a href="{% url 'ordination-extraction' %}">
-                                        <span>Construct ordination</span>
-                                    </a>
-                                </li>
-                                <li page="similarity-extraction">
-                                    <a href="{% url 'similarity-extraction' %}">
-                                        <span>Calculate similarity</span>
-                                    </a>
-                                </li>
-                            </ul>
-                        </div>
-                    </div>
-
-                    <div class="menu-item-expandable">
-                        <a href="#">
-                            <span>Classify & manage units</span>
-                        </a>
-                        <div class="menu-submenu">
-                            <ul>
-                                <li page="view-ordination">
-                                    <a class="appendable" href="{% url 'view-ordination' %}">
-                                        <span>Ordination</span>
-                                    </a>
-                                </li>
-
-                                <li page="syllables">
-                                    <a class="appendable" href="{% url 'syllables' %}">
-                                        <span>Unit table</span>
-                                    </a>
-                                </li>
-
-                                <li page="exemplars">
-                                    <a class="appendable" href="{% url 'exemplars' %}">
-                                        <span>Exemplars</span>
-                                    </a>
-                                </li>
-                            </ul>
-                        </div>
-                    </div>
-
-                    <div class="menu-item-expandable">
-                        <a href="#">
-                            <span>Syntax analysis</span>
-                        </a>
-                        <div class="menu-submenu">
-                            <ul>
-                                <li page="sequence-mining">
-                                    <a class="appendable" href="{% url 'sequence-mining' %}">
-                                        <span>Mine sequence structure</span>
-                                    </a>
-                                </li>
-
-                                <li page="syntax">
-                                    <a class="appendable" href="{% url 'syntax' %}">
-                                        <span>Syntax-aided categorisation</span>
-                                    </a>
-                                </li>
-
-                            </ul>
-                        </div>
-                    </div>
-
                 </li>
-
                 <li class="menu-section">
                     <span>Extra</span>
                     <div class="menu-item" page="help">
-                        <a href="https://github.com/fzyukio/koe/wiki">
+                        <a href="https://github.com/fzyukio/infocare/wiki">
                             <span>Help</span>
-                        </a>
-                    </div>
-                    <div class="menu-item" page="contact-us">
-                        <a href="{% url 'contact-us' %}">
-                            <span>Contact us</span>
                         </a>
                     </div>
                 </li>
@@ -153,7 +57,7 @@
     </div>
     <!-- sidebar-content  -->
     <div id="sidebar-footer">
-        <a href="//gitlab.com/yukio/koe">
+        <a href="//gitlab.com/yukio/infocare">
             <i class="fa fa-gitlab"></i>
         </a>
         <a href="//github.com/fzyukio">
@@ -167,5 +71,3 @@
         </a>
     </div>
 </nav>
-
-{% include 'partials/go-to-songs-modal.html' %}

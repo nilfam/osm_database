@@ -3,7 +3,7 @@
 Hi, {{ user }}
 
 
-Your Koe job has finished. Details follow:
+Your Infocare job has finished. Details follow:
 {% if dm %}
     Job type: Extract feature measurements (Data matrix).
     Created at: {{ dm.task.created }}
@@ -56,4 +56,4 @@ Your Koe job has finished. Details follow:
 {% endif %}
 
 Best regards,
-The Koe project
+The Infocare project

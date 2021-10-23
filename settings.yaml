@@ -36,7 +36,7 @@ broker:
 
 
 environment_variables:
-    WEBPACK_SERVER_PORT: 9876
+    WEBPACK_SERVER_PORT: 9875
 
 jupyter:
     password: sha1:32666b16d662:f3327260b56c45effdc64acc6c331ec6305f137d

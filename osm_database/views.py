@@ -8,7 +8,7 @@ envconf = get_config()
 
 
 def get_home_page(request):
-    return render(request, 'home_page.html')
+    return render(request, 'prototype.html')
 
 
 def get_view(name):

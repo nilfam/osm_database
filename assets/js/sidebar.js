@@ -54,7 +54,7 @@ export const replaceSidebar = function (viewportChangeHandler) {
 
     return new Promise(function (resolve) {
         postRequest({
-            requestSlug: 'koe/get-sidebar',
+            requestSlug: 'infocare/get-sidebar',
             data: {
                 page: pageName
             },

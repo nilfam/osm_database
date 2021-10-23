@@ -95,7 +95,7 @@ class SpectrogramControlForm extends React.Component {
         let fileId = this.spectViz.audioData.fileId;
 
         if (!isNull(fileId)) {
-            let url = getUrl('send-request', 'koe/save-database-spectrogram-preference');
+            let url = getUrl('send-request', 'infocare/save-database-spectrogram-preference');
             let data = {'file-id': this.spectViz.audioData.fileId, colourmap: state['colourMap'], zoom: state['zoom']};
 
             $.post(url, data).done(function (response) {

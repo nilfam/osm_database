@@ -106,7 +106,7 @@ class NewDatabaseForm extends React.Component {
         let self = this;
         let state = self.state;
 
-        let url = getUrl('send-request', 'koe/create-database');
+        let url = getUrl('send-request', 'infocare/create-database');
 
         $.post(url, state).done(function (response) {
             response = JSON.parse(response);

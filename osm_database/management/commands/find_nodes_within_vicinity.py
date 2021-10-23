@@ -86,8 +86,13 @@ def find_max_deviation(lat, lon, vicinity):
 
     min_lon_factor = refine_range_negative_direction(lat, lon, -2, 1, lower_bound, upper_bound, 'lon')
     max_lon_factor = refine_range_positive_direction(lat, lon, 1, 2, lower_bound, upper_bound, 'lon')
-    min_lon = lon * min_lon_factor
-    max_lon = lon * max_lon_factor
+
+    if lon > 0:
+        min_lon = lon * min_lon_factor
+        max_lon = lon * max_lon_factor
+    else:
+        max_lon = lon * min_lon_factor
+        min_lon = lon * max_lon_factor
 
     # distance_to_right_boundary = geodesic((lat, lon), (max_lat, lon)).meters
     # print(distance_to_right_boundary)
