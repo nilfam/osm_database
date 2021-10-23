@@ -245,7 +245,14 @@ ERROR_TRACKER = None
 # For local run:
 if DEBUG:
 
-    HOST = 'http://localhost:8000'
+    try:
+        import pymysql
+
+        pymysql.install_as_MySQLdb()
+    except:
+        pass
+
+    HOST = 'http://localhost:8001'
 
     STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 

@@ -141,25 +141,11 @@ const jumpNext = function (e, type) {
 };
 
 
-const initKeyboardShortcuts = function () {
-    keyboardJS.bind(['space'], playAudioOnKey);
-    keyboardJS.bind(['shift + space'], toggleSelectHighlightedRow);
-    keyboardJS.bind(['ctrl + `'], deselectAll);
-    keyboardJS.bind(['shift + mod + down', 'ctrl + down', 'mod + down', 'ctrl + shift + down'], function (e) {
-        jumpNext(e, 'down');
-    });
-    keyboardJS.bind(['shift + mod + up', 'ctrl + up', 'mod + up', 'ctrl + shift + up'], function (e) {
-        jumpNext(e, 'up');
-    });
-};
-
-
 /**
  * Put everything you need to run before the page has been loaded here
  * @private
  */
 const _preRun = function () {
-    initKeyboardShortcuts();
     restoreModalAfterClosing();
     subMenuOpenRight();
     initChangeArgSelections();

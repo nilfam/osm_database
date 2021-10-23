@@ -9,7 +9,7 @@ allowed_hosts:
     - '0.0.0.0'
     - '127.0.0.1'
 
-site_url: 'http://127.0.0.1:8000/'
+site_url: 'http://127.0.0.1:8001/'
 email_config: 'smtp.gmail.com:koe.io.ac.nz:9BnpR%ebC#Tl!5d:465'
 from_email: 'koe.io.ac.nz@gmail.com'
 
@@ -45,8 +45,8 @@ jupyter:
 
 secret_key: r'ur3@h0h04@4e2_ll-_^($ksqja0q!38iwdjfd73$n+$k(f_i8k'
 
-path_to_mysql: C:\Program Files\MySQL\MySQL Server 8.0\bin\mysql.exe
-path_to_mysqldump: C:\Program Files\MySQL\MySQL Server 8.0\bin\mysqldump.exe
+#path_to_mysql: C:\Program Files\MySQL\MySQL Server 8.0\bin\mysql.exe
+#path_to_mysqldump: C:\Program Files\MySQL\MySQL Server 8.0\bin\mysqldump.exe
 
-#path_to_mysql: mysql
-#path_to_mysqldump: mysqldump
+path_to_mysql: mysql
+path_to_mysqldump: mysqldump
