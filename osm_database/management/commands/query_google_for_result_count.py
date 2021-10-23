@@ -103,7 +103,7 @@ class Command(BaseCommand):
         parser.add_argument('--auto', action='store_true', dest='automode', default=False)
 
     def populate_locations_from_excel(self, file):
-        xl = pd.ExcelFile(file)
+        xl = pd.ExcelFile(file, engine='openpyxl')
 
         for sheet_name in xl.sheet_names:
             df = xl.parse(sheet_name)
@@ -156,7 +156,7 @@ class Command(BaseCommand):
         pathlib.Path(xlsx_dir).mkdir(parents=True, exist_ok=True)
         xlsx_file_name = os.path.join(self.cache_dir, 'xlsx', '{}-counted.xlsx'.format(file_name))
 
-        input_excel_file = pd.ExcelFile(input_file)
+        input_excel_file = pd.ExcelFile(input_file, engine='openpyxl')
         headers = ['OSM ID', 'Name', 'Count']
 
         dfs = []

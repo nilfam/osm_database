@@ -268,7 +268,7 @@ class Command(BaseCommand):
         parser.add_argument('--auto', action='store_true', dest='automode', default=False)
 
     def populate_expressions_from_excel(self, file):
-        xl = pd.ExcelFile(file)
+        xl = pd.ExcelFile(file, engine='openpyxl')
 
         for sheet_name in xl.sheet_names:
             if sheet_name.startswith('#'):
