@@ -1,4 +1,6 @@
 import csv
+import os
+import pathlib
 import pickle
 from collections import OrderedDict
 from decimal import Decimal
@@ -6,13 +8,16 @@ from decimal import Decimal
 from django.core.management import BaseCommand
 
 from osm_database.management.commands.util import *
-from osm_database.models import *
-
-warnings.filterwarnings("ignore", category=InsecureRequestWarning)
+from osm_database.models import OsmEntity
+from shapely.geometry import Point, Polygon
 
 import pandas as pd
 
-from min_bounding_rect import *
+
+current_dir = os.path.dirname(os.path.abspath(__file__))
+script_name = os.path.split(__file__)[1][0:-3]
+dir_parts = current_dir.split(os.path.sep)
+cache_dir = os.path.join(os.path.sep.join(dir_parts[0:dir_parts.index('management')]), 'cache', script_name)
 
 
 class ExcelRowInfo:
@@ -28,6 +33,11 @@ class ExcelRowInfo:
 
 
 class Command(BaseCommand):
+    def __init__(self):
+        super().__init__()
+        self.cache_dir = cache_dir
+        pathlib.Path(cache_dir).mkdir(parents=True, exist_ok=True)
+        self.cache_file = os.path.join(self.cache_dir, 'relatum_onlyPoly1.pkl')
 
     def handle(self, *args, **options):
         file = r'files/csv/ConnersDataused.csv'
@@ -46,9 +56,9 @@ class Command(BaseCommand):
         point_ids_to_geopoints = None
         geojson_to_point_id = None
 
-        cache_file = "relatum_onlyPoly1.pkl"
-        if os.path.isfile(cache_file):
-            with open(cache_file, 'rb') as f:
+
+        if os.path.isfile(self.cache_file):
+            with open(self.cache_file, 'rb') as f:
                 info = pickle.load(f)
                 excel_row_infos = info.get('excel_row_infos', None)
                 rc_lats = info.get('rc_lats', None)
@@ -90,7 +100,7 @@ class Command(BaseCommand):
             info['rc_lats'] = rc_lats
             info['rc_lons'] = rc_lons
 
-            with open(cache_file, 'wb') as f:
+            with open(self.cache_file, 'wb') as f:
                 pickle.dump(info, f)
 
         osm_entities = OsmEntity.objects.filter(lat__in=rc_lats, lon__in=rc_lons)
@@ -101,7 +111,7 @@ class Command(BaseCommand):
             info['ext_ring_ids_to_list_of_points'] = ext_ring_ids_to_list_of_points
             info['geojson_to_exterior_id'] = geojson_to_exterior_id
 
-            with open(cache_file, 'wb') as f:
+            with open(self.cache_file, 'wb') as f:
                 pickle.dump(info, f)
 
         if lines_ids_to_list_of_points is None:
@@ -109,7 +119,7 @@ class Command(BaseCommand):
             info['lines_ids_to_list_of_points'] = lines_ids_to_list_of_points
             info['geojson_to_line_id'] = geojson_to_line_id
 
-            with open(cache_file, 'wb') as f:
+            with open(self.cache_file, 'wb') as f:
                 pickle.dump(info, f)
 
         if multiline_ids_to_list_of_points is None:
@@ -117,23 +127,23 @@ class Command(BaseCommand):
             info['multiline_ids_to_list_of_points'] = multiline_ids_to_list_of_points
             info['geojson_to_multiline_id'] = geojson_to_multiline_id
 
-            with open(cache_file, 'wb') as f:
+            with open(self.cache_file, 'wb') as f:
                 pickle.dump(info, f)
         
-        if multipoly_ids_to_list_of_points is None:
-            geojson_to_multipoly_id, multipoly_ids_to_list_of_points = extract_points_for_multipolygons(osm_entities)
-            info['multipoly_ids_to_list_of_points'] = multipoly_ids_to_list_of_points
-            info['geojson_to_multipoly_id'] = geojson_to_multipoly_id
-
-            with open(cache_file, 'wb') as f:
-                pickle.dump(info, f)
+        # if multipoly_ids_to_list_of_points is None:
+        #     geojson_to_multipoly_id, multipoly_ids_to_list_of_points = extract_points_for_multipolygons(osm_entities)
+        #     info['multipoly_ids_to_list_of_points'] = multipoly_ids_to_list_of_points
+        #     info['geojson_to_multipoly_id'] = geojson_to_multipoly_id
+        #
+        #     with open(self.cache_file, 'wb') as f:
+        #         pickle.dump(info, f)
 
         if point_ids_to_geopoints is None:
             geojson_to_point_id, point_ids_to_geopoints = extract_points_for_point(osm_entities)
             info['point_ids_to_geopoints'] = point_ids_to_geopoints
             info['geojson_to_point_id'] = geojson_to_point_id
 
-            with open(cache_file, 'wb') as f:
+            with open(self.cache_file, 'wb') as f:
                 pickle.dump(info, f)
 
         bar = Bar("Extracting osm_entities info", max=entities_vl.count())
@@ -158,9 +168,9 @@ class Command(BaseCommand):
             elif geojson_type == 'MultiLineString':
                 multiline_id = geojson_to_multiline_id[geojson_id]
                 points = multiline_ids_to_list_of_points[multiline_id]
-            elif geojson_type == 'MultiPolygon':
-                multipoly_id = geojson_to_multipoly_id[geojson_id]
-                points = multipoly_ids_to_list_of_points[multipoly_id]
+            # elif geojson_type == 'MultiPolygon':
+            #     multipoly_id = geojson_to_multipoly_id[geojson_id]
+            #     points = multipoly_ids_to_list_of_points[multipoly_id]
             elif geojson_type == 'Point':
                 point_id = geojson_to_point_id[geojson_id]
                 points = [point_ids_to_geopoints[point_id]]
@@ -209,16 +219,16 @@ class Command(BaseCommand):
                 excel_string = 'MULTILINESTRING(' + ','.join(linestring_strs_quoted) + ')'
                 excel_col = '[' + ', '.join(linestring_strs) + ']'
 
-            elif excel_row.geojson_type == 'MultiPolygon':
-                # continue
-                polygon_strs = []
-                polygon_strs_quoted = []
-                for polygon_points in excel_row.wkt_points:
-                    polygon_str = ','.join(['{} {}'.format(x[0], x[1]) for x in polygon_points])
-                    polygon_strs.append(polygon_str)
-                    polygon_strs_quoted.append('((' + polygon_str + '))')
-                excel_string = 'MULTIPOLYGON(' + ','.join(polygon_strs_quoted) + ')'
-                excel_col = '[' + ', '.join(polygon_strs) + ']'
+            # elif excel_row.geojson_type == 'MultiPolygon':
+            #     # continue
+            #     polygon_strs = []
+            #     polygon_strs_quoted = []
+            #     for polygon_points in excel_row.wkt_points:
+            #         polygon_str = ','.join(['{} {}'.format(x[0], x[1]) for x in polygon_points])
+            #         polygon_strs.append(polygon_str)
+            #         polygon_strs_quoted.append('((' + polygon_str + '))')
+            #     excel_string = 'MULTIPOLYGON(' + ','.join(polygon_strs_quoted) + ')'
+            #     excel_col = '[' + ', '.join(polygon_strs) + ']'
 
             elif excel_row.geojson_type == 'Point':
                 excel_string = 'POINT(' + ','.join(['{}'.format(x) for x in excel_row.wkt_points[0]]) + ')'
@@ -234,5 +244,5 @@ class Command(BaseCommand):
             bar.next()
         bar.finish()
 
-        output_df.to_csv('OnlyPolyNotchanged.csv', index=False)
-        output_df_polygons.to_csv('Polygon_Str.csv', index=False, header=True, sep='*', quoting=csv.QUOTE_NONE)
+        output_df.to_csv(os.path.join(self.cache_dir, 'OnlyPolyNotchanged.csv'), index=False)
+        output_df_polygons.to_csv(os.path.join(self.cache_dir, 'Polygon_Str.csv'), index=False, header=True, sep='*', quoting=csv.QUOTE_NONE)
