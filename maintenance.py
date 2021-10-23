@@ -13,6 +13,11 @@ from shutil import copyfile
 import yaml
 from django.core.files.temp import NamedTemporaryFile
 
+try:
+    from collections.abc import Callable  # noqa
+except ImportError:
+    from collections import Callable  # noqa
+
 CONF = {}
 
 
@@ -34,7 +39,7 @@ def get_config():
         return CONF
 
     with open(filename, 'r', encoding='utf-8') as f:
-        conf = yaml.load(f)
+        conf = yaml.safe_load(f)
 
     if conf.get('secret_key', None) is None:
         import random
@@ -46,7 +51,7 @@ def get_config():
             f.write('secret_key: r\'{}\''.format(secret))
 
     with open(filename, 'r', encoding='utf-8') as f:
-        conf = yaml.load(f)
+        conf = yaml.safe_load(f)
 
     conf['base_dir'] = base_dir
     CONF.update(conf)
@@ -504,7 +509,7 @@ def restore_database_using_sql():
     return success, err
 
 
-def handle_function(func: collections.Callable, *args, **kwargs):
+def handle_function(func: Callable, *args, **kwargs):
     func_name = func.__name__
     start = time.time()
 
