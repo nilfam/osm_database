@@ -1,17 +1,15 @@
+from django.conf import settings
 from geopy.distance import geodesic
-from weka.core import jvm
 
 from osm_database.management.commands.find_nodes_within_vicinity import find_max_deviation
-from osm_database.management.commands.util import extract_points_for_polygons, extract_points_for_multipolygons, \
-    extract_points_for_point, extract_points_for_linestrings, extract_points_for_multilinestrings
+from osm_database.management.commands.util import extract_points_for_polygons, extract_points_for_point, \
+    extract_points_for_linestrings, extract_points_for_multilinestrings
 from osm_database.model_utils import get_or_error
 from osm_database.models import OsmEntity
-from django.conf import settings
-
 
 __all__ = ['find_rel', 'find_locs', 'get_geojson_info']
 
-from osm_database.weka_model.weka_util import WekaModel, ExpressionFeatureExtraction
+from weka_model.external_weka_util import call_weka_get_result
 
 
 def find_rel(request):
@@ -41,36 +39,32 @@ def find_locs(request):
     rlon = float(entity.lon)
 
     feature_extractor = settings.feature_extractor
-    jvm.start(system_cp=True, packages=True, max_heap_size="512m", system_info=True)
-    weka_model = WekaModel('osm_database/weka_model/connors-1000.model')
 
     retval = []
-    try:
-        embed = feature_extractor.embed(loc_type, preposition, entity.display_name, rlat, rlon, loc_type, entity.type)
-        row = weka_model.convert_embed(embed)
-        vicinity = weka_model.predict(row)
+    embed = feature_extractor.embed(loc_type, preposition, entity.display_name, rlat, rlon, loc_type, entity.type)
+    future = call_weka_get_result(embed)
+    vicinity = future.result()
 
-        explanation = '<p>Based on the model, the expression "{} {} {}" yields distance {:.2f} meters, which is the ' \
-                      'radius of this circle shown here, centred on the relatum centroid. </p>' \
-                      '<p>Orange circles represents locatums of type {} that are found within this vicinity.</p>'\
-            .format(loc_type, preposition, entity.display_name, vicinity, vicinity, rlat, rlon, loc_type)
-        retval.append({'id': 'vicinity', 'radius': vicinity, 'lat': rlat, 'lon': rlon, 'explanation': explanation})
+    explanation = '<p>Based on the model, the expression "{} {} {}" yields distance {:.2f} meters, which is the ' \
+                  'radius of this circle shown here, centred on the relatum centroid. </p>' \
+                  '<p>Orange circles represents locatums of type {} that are found within this vicinity.</p>'\
+        .format(loc_type, preposition, entity.display_name, vicinity, loc_type)
+    retval.append({'id': 'vicinity', 'radius': vicinity, 'lat': rlat, 'lon': rlon, 'explanation': explanation})
 
-        min_lat, max_lat, min_lon, max_lon = find_max_deviation(float(entity.lat), float(entity.lon), 1000)
-        possible_locs = OsmEntity.objects.filter(lat__gte=min_lat, lat__lte=max_lat, lon__gte=min_lon, lon__lte=max_lon,
-                                                 type=loc_type).values_list('id', 'display_name', 'lat', 'lon')
+    min_lat, max_lat, min_lon, max_lon = find_max_deviation(float(entity.lat), float(entity.lon), 1000)
+    possible_locs = OsmEntity.objects.filter(lat__gte=min_lat, lat__lte=max_lat, lon__gte=min_lon, lon__lte=max_lon,
+                                             type=loc_type).values_list('id', 'display_name', 'lat', 'lon')
 
-        for id, dn, llat, llon in possible_locs:
-            distance_c2c = geodesic((llat, llon), (rlat, rlon)).meters
-            if distance_c2c > vicinity:
-                continue
+    for id, dn, llat, llon in possible_locs:
+        distance_c2c = geodesic((llat, llon), (rlat, rlon)).meters
+        if distance_c2c > vicinity:
+            continue
 
-            if llat > 10:
-                retval.append({'id': id, 'name': dn, 'lat': llon, 'lon': llat, 'dist': distance_c2c})
-            else:
-                retval.append({'id': id, 'name': dn, 'lat': llat, 'lon': llon, 'dist': distance_c2c})
-    finally:
-        jvm.stop()
+        if llat > 10:
+            retval.append({'id': id, 'name': dn, 'lat': llon, 'lon': llat, 'dist': distance_c2c})
+        else:
+            retval.append({'id': id, 'name': dn, 'lat': llat, 'lon': llon, 'dist': distance_c2c})
+
     return retval
 
 

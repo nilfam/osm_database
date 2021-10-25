@@ -34,3 +34,4 @@ xlrd==1.2.0
 nltk
 javabridge==1.0.19
 python-weka-wrapper3==0.2.3
+Pebble==4.6.3

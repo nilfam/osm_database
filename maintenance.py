@@ -144,7 +144,7 @@ def backup_mysql():
     :return: None
     """
     with create_tmp_mysql_conf() as temp_conf:
-        cmd = [path_to_mysqldump, '--defaults-extra-file={}'.format(temp_conf.name), db_name, '--result-file', backup_file]
+        cmd = [path_to_mysqldump, '--defaults-extra-file={}'.format(temp_conf.name), db_name, '--result-file', backup_file, '--no-tablespaces']
         out, err = run_command(cmd, suppress_output=True)
 
         return err == b'', err.decode('utf-8')
