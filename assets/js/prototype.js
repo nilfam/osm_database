@@ -7,33 +7,34 @@ let map;
 let zoomLevel = 13;
 let currentRelatum = null;
 let currentLocatums = null;
+let currentVicinity = null;
+
 let $relatum = $('#relatum');
 let $submitBtn = $('#submitBtn');
 let $locatum = $('#locatum');
 let $prep = $('#preposition');
 
 function onEachFeature(feature, layer) {
-    var popupContent = "<p>This OSM Entity is type " + feature.geometry.type + "</p>";
+    var namePart = "<p>Name: $name$ </p>";
+    var distPart = "<p>Distance to relatum: $dist$ </p>";
 
-    if (feature.properties && feature.properties.name) {
-        popupContent += feature.properties.name;
+    var popupContent = [];
+
+    if (feature.properties) {
+        if (feature.properties.name)
+        {
+            namePart = namePart.replace('$name$', feature.properties.name)
+            popupContent.push(namePart)
+        }
+        if (feature.properties.dist)
+        {
+            distPart = distPart.replace('$dist$', feature.properties.dist)
+            popupContent.push(distPart)
+        }
     }
 
+    popupContent = popupContent.join('')
     layer.bindPopup(popupContent);
-}
-
-let relatumGeoJsonTemplate = {
-    "type": "Feature",
-    "properties": {
-        "name": null,
-        "style": {
-            weight: 2,
-            color: "#999",
-            opacity: 1,
-            fillColor: "#B0DE5C",
-            fillOpacity: 0.2
-        }
-    },
 }
 
 let locatumGeoJsonTemplate = {
@@ -53,13 +54,40 @@ let locatumCollectionGeoJsonTemplate = {
     "features": []
 };
 
-function addRelatumToMap (geojson) {
-    let geojsonObject = L.geoJSON(geojson, {
+
+let relatumGeoJsonTemplate = {
+    "type": "Feature",
+    'centroid': {
+        'type': 'Point',
+        'coordinates': null
+    },
+    'geometry': {
+        'type': null,
+        'coordinates': null
+    },
+    "properties": {
+        "name": null,
+        "style": {
+            weight: 2,
+            color: "#999",
+            opacity: 1,
+            fillColor: "#B0DE5C",
+            fillOpacity: 0.2
+        }
+    },
+}
+
+function addRelatumToMap (geojson, name) {
+    let geoJsonObject = deepCopy(relatumGeoJsonTemplate);
+    geoJsonObject.centroid.coordinates = [geojson.lat, geojson.lon];
+    geoJsonObject.geometry.type = geojson.geotype;
+    geoJsonObject.geometry.coordinates = geojson.coordinates;
+    geoJsonObject.properties.name = name;
+
+    let geojsonObject = L.geoJSON(geoJsonObject, {
         style: function (feature) {
             return feature.properties && feature.properties.style;
         },
-
-        onEachFeature: onEachFeature,
 
         pointToLayer: function (feature, latlng) {
             return L.circleMarker(latlng, {
@@ -72,10 +100,29 @@ function addRelatumToMap (geojson) {
             });
         }
     });
+
+    geojsonObject.bindPopup(`
+        <p>This is the relatum.</p>
+        <p>Name: ${name}</p>
+        <p>OSM Id: ${geojson.osm_id}</p>
+        <p>OSM Type: ${geojson.osm_type}</p>
+        <p>Geometry Type: ${geojson.geotype}</p>
+        <p>Coordinates: [${geojson.lat} lat, ${geojson.lon} lon]</p>
+    `);
+
     if (currentRelatum !== null)
         map.removeLayer(currentRelatum);
     geojsonObject.addTo(map);
     currentRelatum = geojsonObject;
+
+    // Remove the vicinity and locatums
+    if (currentVicinity !== null)
+        map.removeLayer(currentVicinity);
+    if (currentLocatums !== null)
+        map.removeLayer(currentLocatums);
+    currentVicinity = null;
+    currentLocatums = null;
+
     map.fitBounds(geojsonObject.getBounds());
 }
 
@@ -104,6 +151,27 @@ function addLocatumsToMap (geojson) {
         map.removeLayer(currentLocatums);
     geojsonObject.addTo(map);
     currentLocatums = geojsonObject;
+}
+
+function addVicinityToMap (vicinity) {
+    let geojsonObject = L.circle([vicinity.lat, vicinity.lon], vicinity.radius, {
+        stroke: "#000",
+        fillColor: "#B0DE5C",
+        weight: 2,
+        opacity: 1,
+        fillOpacity: 0.1
+    });
+
+    geojsonObject.bindPopup(vicinity.explanation);
+
+    if (currentVicinity !== null)
+        map.removeLayer(currentVicinity);
+    geojsonObject.addTo(map);
+    currentVicinity = geojsonObject;
+
+    map.removeLayer(currentRelatum);
+    currentRelatum.addTo(map);
+
     map.fitBounds(geojsonObject.getBounds());
 }
 
@@ -173,11 +241,7 @@ function initAutocompleteForRelatum() {
                 data: {osm_id: ui.item.osm_id, osm_type: ui.item.osm_type},
                 onSuccess(geojson) {
                     geojson = geojson[0]
-                    let geoJsonObject = deepCopy(relatumGeoJsonTemplate);
-                    geoJsonObject.centroid = geojson.centroid;
-                    geoJsonObject.geometry = geojson.geometry;
-                    geoJsonObject.properties.name = ui.item.label;
-                    addRelatumToMap(geoJsonObject);
+                    addRelatumToMap(geojson, ui.item.label);
                 },
                 immediate: true,
             });
@@ -198,15 +262,35 @@ function initSubmitBtn () {
             requestSlug: 'osm_database/find-locs',
             data: {loc_type: locatumType, osm_type: osmType, osm_id: osmId, preposition: prepType},
             onSuccess(locatumArr) {
+                if (locatumArr.length === 0) {
+                    if (currentLocatums !== null)
+                        map.removeLayer(currentLocatums);
+                    currentLocatums = null;
+                    return;
+                }
                 let locatumCollectionGeoJson = deepCopy(locatumCollectionGeoJsonTemplate);
+                let vicinity = null;
                 $.each(locatumArr, function (_, geojson) {
-                    let geoJsonObject = deepCopy(locatumGeoJsonTemplate);
-                    geoJsonObject.geometry.coordinates = [geojson.lat, geojson.lon];
-                    geoJsonObject.properties.name = geojson.name;
-                    geoJsonObject.id = geojson.id;
-                    locatumCollectionGeoJson.features.push(geoJsonObject)
+                    if (geojson.id === 'vicinity')
+                    {
+                        if (vicinity !== null)
+                            throw new Error('Two vicinity objects found in response');
+                        vicinity = geojson;
+                    }
+                    else
+                    {
+                        let geoJsonObject = deepCopy(locatumGeoJsonTemplate);
+                        geoJsonObject.geometry.coordinates = [geojson.lat, geojson.lon];
+                        geoJsonObject.properties.name = geojson.name;
+                        geoJsonObject.properties.dist = geojson.dist;
+                        geoJsonObject.id = geojson.id;
+                        locatumCollectionGeoJson.features.push(geoJsonObject)
+                    }
                 });
 
+                if (vicinity === null)
+                    throw new Error('No vicinity object found in response');
+                addVicinityToMap(vicinity);
                 addLocatumsToMap(locatumCollectionGeoJson);
             },
             immediate: true,

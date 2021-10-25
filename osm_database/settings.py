@@ -29,6 +29,10 @@ if DEBUG:
 else:
     DEBUG = envconf['debug']
 
+JVM_STARTED = False
+weka_model = None
+feature_extractor = None
+
 ALLOWED_HOSTS = envconf['allowed_hosts']
 
 ADMINS = (

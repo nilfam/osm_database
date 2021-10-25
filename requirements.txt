@@ -32,3 +32,5 @@ openpyxl==3.0.5
 xlrd==1.2.0
 #shapely==1.7.1
 nltk
+javabridge==1.0.19
+python-weka-wrapper3==0.2.3

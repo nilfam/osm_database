@@ -32,7 +32,7 @@ def calc_distance(exp1, exp2):
     """
 
     if not isinstance(exp1, str) or not isinstance(exp2, str):
-        raise Exception('Is not string')
+        raise Exception('"{}" or "{}" is not string'.format(exp1, exp2))
 
     max_sim = None
 
@@ -115,6 +115,8 @@ def recursive_add_parents(core_features, root_feature, thing, rank):
         return
 
     for parent in root_feature.parent:
+        if parent == root_feature:
+            continue
         core_features[parent.name] = (parent, rank)
         recursive_add_parents(core_features, parent, thing, rank+1)
 
@@ -193,23 +195,31 @@ class Command(BaseCommand):
             extracted = {}
 
         bar = Bar('Reading excel file...', max=df.shape[0])
-        for index, row in df.iterrows():
-            relatum_type = row['TYPE']
-            if relatum_type == '':
-                features, sims = None, None
-            elif relatum_type in extracted:
-                features, sims = extracted[relatum_type]
-            else:
-                features, sims = find_best_match(relatum_type, wordnet_feature_dict)
-                extracted[relatum_type] = features, sims
-            if features is not None:
-                for feature in features:
-                    recursive_add_parents(core_features_all, feature, thing, 1)
-            bar.next()
-        bar.finish()
+        try:
+            for index, row in df.iterrows():
+                relatum_type = row['TYPE']
+                if relatum_type == '':
+                    features, sims = None, None
+                elif relatum_type in extracted:
+                    features, sims = extracted[relatum_type]
+                else:
+                    features, sims = find_best_match(relatum_type, wordnet_feature_dict)
+                    extracted[relatum_type] = features, sims
+                if features is not None:
+                    for feature in features:
+                        recursive_add_parents(core_features_all, feature, thing, 1)
 
-        with open(extracted_cache, 'wb') as f:
-            pickle.dump(extracted, f)
+                if index % 10 == 0:
+                    with open(extracted_cache, 'wb') as f:
+                        pickle.dump(extracted, f)
+
+                bar.next()
+            bar.finish()
+        except Exception as e:
+            raise e
+        finally:
+            with open(extracted_cache, 'wb') as f:
+                pickle.dump(extracted, f)
 
         columns = ['0name', '1osm feature 1', '2match score 1', '3osm feature 2', '4match score 2', '5osm feature 3', '6match score 3']
         column_index = len(columns)
