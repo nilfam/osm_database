@@ -53,7 +53,7 @@ def find_locs(request):
 
     min_lat, max_lat, min_lon, max_lon = find_max_deviation(float(entity.lat), float(entity.lon), 1000)
     possible_locs = OsmEntity.objects.filter(lat__gte=min_lat, lat__lte=max_lat, lon__gte=min_lon, lon__lte=max_lon,
-                                             type=loc_type).values_list('id', 'display_name', 'lat', 'lon')
+                                             type__icontains=loc_type).values_list('id', 'display_name', 'lat', 'lon')
 
     for id, dn, llat, llon in possible_locs:
         distance_c2c = geodesic((llat, llon), (rlat, rlon)).meters

@@ -197,8 +197,7 @@ function decorateSelect() {
         dropdownAlignRight: 'auto',
         selectOnTab: true,
         liveSearch: true,
-        liveSearchStyle: 'startsWith',
-        liveSearchNormalize: true
+        liveSearchStyle: 'contains',
     });
 }
 
