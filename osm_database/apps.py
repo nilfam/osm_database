@@ -37,6 +37,3 @@ class OsmDatabaseConfig(AppConfig):
                 register_app_modules('root', 'models')
 
                 init_tables()
-
-        if run_main:
-            settings.feature_extractor = ExpressionFeatureExtraction()

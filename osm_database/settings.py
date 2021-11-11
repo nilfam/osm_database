@@ -1,7 +1,13 @@
 import datetime
 import os
+import pathlib
+import tempfile
 import traceback
 from json import JSONEncoder
+
+from pathlib import Path
+import platform
+import tempfile
 
 import decimal
 import dj_database_url
@@ -28,10 +34,6 @@ if DEBUG:
     DEBUG = DEBUG == 'true'
 else:
     DEBUG = envconf['debug']
-
-JVM_STARTED = False
-weka_model = None
-feature_extractor = None
 
 ALLOWED_HOSTS = envconf['allowed_hosts']
 
@@ -245,6 +247,13 @@ NOTEBOOK_ARGUMENTS = [
 ]
 
 ERROR_TRACKER = None
+
+tempdir = Path("/tmp" if platform.system() == "Darwin" else tempfile.gettempdir())
+
+WEKA_INPUT_DIR = os.path.join(tempdir, 'weka-input')
+WEKA_OUTPUT_DIR = os.path.join(tempdir, 'weka-output')
+pathlib.Path(WEKA_INPUT_DIR).mkdir(parents=True, exist_ok=True)
+pathlib.Path(WEKA_OUTPUT_DIR).mkdir(parents=True, exist_ok=True)
 
 # For local run:
 if DEBUG:

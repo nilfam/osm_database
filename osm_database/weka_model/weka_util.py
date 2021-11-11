@@ -20,6 +20,9 @@ def clean_up(text):
 class WekaModel:
     def __init__(self, model_file):
         self.classifier, self.dataset = Classifier.deserialize(model_file)
+        self.attr_names = []
+        for attr in self.dataset.attributes():
+            self.attr_names.append(attr.name)
 
     def predict(self, row):
         inst = Instance.create_instance(row)
@@ -33,8 +36,7 @@ class WekaModel:
 
     def convert_embed(self, embed_dict):
         row = []
-        for attr in self.dataset.attributes():
-            attr_name = attr.name
+        for attr_name in self.attr_names:
             if attr_name.endswith('Row ID'):
                 row.append(1)
             else:

@@ -1,4 +1,3 @@
-from django.conf import settings
 from geopy.distance import geodesic
 
 from osm_database.management.commands.find_nodes_within_vicinity import find_max_deviation
@@ -9,7 +8,7 @@ from osm_database.models import OsmEntity
 
 __all__ = ['find_rel', 'find_locs', 'get_geojson_info']
 
-from weka_model.external_weka_util import call_weka_get_result
+from weka_model.external_weka_util import weka_output_handle
 
 
 def find_rel(request):
@@ -38,11 +37,8 @@ def find_locs(request):
     rlat = float(entity.lat)
     rlon = float(entity.lon)
 
-    feature_extractor = settings.feature_extractor
-
     retval = []
-    embed = feature_extractor.embed(loc_type, preposition, entity.display_name, rlat, rlon, loc_type, entity.type)
-    future = call_weka_get_result(embed)
+    future = weka_output_handle(loc_type, preposition, entity.display_name, rlat, rlon, loc_type, entity.type)
     vicinity = future.result()
 
     explanation = '<p>Based on the model, the expression "{} {} {}" yields distance {:.2f} meters, which is the ' \
