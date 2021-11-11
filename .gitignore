@@ -33,3 +33,4 @@ files/
 osm_database/management/util/browser-drivers/
 osm_database/cache/
 *.sql
+scrape/cache

@@ -1,0 +1,32 @@
+{% extends 'base-with-grid.html' %}
+{% load staticfiles %}
+{% load custom_tags %}
+
+{% block title %}Pages{% endblock %}
+
+
+{% block content-grid %}
+    <div class="controller-wrapper">
+        <div id="menu-opener">
+            <div class="input-group">
+                <i class="fa fa-bars input-group-addon left siderbar-toggler" aria-hidden="true"></i>
+            </div>
+        </div>
+
+        <div id="grid-status">
+            <div class="input-group">
+                <span class="input-group-addon left"><span id="ntotal">0</span></span>
+            </div>
+        </div>
+
+        <div class="grid-controller">
+            <div class="input-group">
+                <span class="input-group-addon left">Filter</span>
+                <input id="pages-info-filter" type="text" class="form-control middle">
+            </div>
+        </div>
+    </div>
+
+    <div class="has-grid" id="pages-info"></div>
+
+{% endblock %}

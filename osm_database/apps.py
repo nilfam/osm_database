@@ -31,9 +31,7 @@ class OsmDatabaseConfig(AppConfig):
             is_importing_fixture = os.getenv('IMPORTING_FIXTURE', 'false') == 'true'
 
             if not is_importing_fixture:
-                from root.views import register_app_modules, init_tables
+                from root.views import register_app_modules
                 register_app_modules(self.name, 'request_handlers.general')
                 register_app_modules(self.name, 'models')
                 register_app_modules('root', 'models')
-
-                init_tables()

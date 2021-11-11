@@ -57,6 +57,7 @@ INSTALLED_APPS = [
     'tz_detect',
     'root',
     'osm_database',
+    'scrape',
     'django_extensions'
 ]
 

@@ -415,6 +415,9 @@ $(document).ready(function () {
     if (pageName === '/') {
         page = require('prototype.js');
     }
+    else if (pageName.startsWith('/pages-info/')) {
+        page = require('pages-info-page');
+    }
 
     let runPage = function () {
         if (isNull(page)) {
