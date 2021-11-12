@@ -344,7 +344,7 @@ class Content(SelfQueryOrLoad):
         db_page.page_number = page_no
         document_text = '\n'.join(document_text)
         document_text = re.sub('[ \t]{2,}', ' ', document_text)
-        db_page.content = re.sub('\n\s+\n', '\n', document_text)
+        document_text = re.sub('\n\s+\n', '\n', document_text)
 
         db_storage.add_pages(db_page)
 
