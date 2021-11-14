@@ -24,6 +24,7 @@ class Publication(SimpleModel):
 class Page(SimpleModel):
     publication = models.ForeignKey(Publication, on_delete=models.CASCADE)
     page_number = models.IntegerField()
+    content = models.TextField()
     url = models.CharField(max_length=1024)
 
     def __str__(self):

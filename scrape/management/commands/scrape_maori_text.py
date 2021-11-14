@@ -137,6 +137,13 @@ class AutoSaveCache:
             os.rename(self.filename_bak, self.filename)
             print('Saved cache')
 
+    def save(self):
+        with open(self.filename_bak, 'wb') as f:
+            pickle.dump(self.db_storage, f)
+
+        os.rename(self.filename_bak, self.filename)
+        print('Saved final cache')
+
 
 class SelfQueryOrLoad:
     def __init__(self, url, cache, browser_wrapper):
@@ -344,7 +351,7 @@ class Content(SelfQueryOrLoad):
         db_page.page_number = page_no
         document_text = '\n'.join(document_text)
         document_text = re.sub('[ \t]{2,}', ' ', document_text)
-        document_text = re.sub('\n\s+\n', '\n', document_text)
+        db_page.content = re.sub('\n\s+\n', '\n', document_text)
 
         db_storage.add_pages(db_page)
 
@@ -387,10 +394,14 @@ class Command(BaseCommand):
             soup = page.query_or_load()
             page.query_all_publications(soup, db_storage)
             self.db_storage.save()
-                
+
+    def finalise(self):
+        self.cache.save()
+
     def handle(self, *args, **options):
         self.browser_wrapper.auto_solve_captcha = True
         self.populate()
+        self.finalise()
 
     def make_query(self):
         self._query_or_populate(False)
