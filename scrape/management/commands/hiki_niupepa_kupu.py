@@ -1,19 +1,16 @@
-import csv
 import datetime
 import os
 import pathlib
 import pickle
 import re
-import time
 import zipfile
-from datetime import datetime
-from pathlib import Path
 
 from bs4 import BeautifulSoup as bs
 from django.core.management import BaseCommand
 
 from scrape.management.util.browser_wrapper import BrowserWrapper
 from scrape.management.util.taumahi import tiki_ōrau
+from scrape.models import Newspaper, Publication, Page
 
 current_dir = os.path.dirname(os.path.abspath(__file__))
 script_name = os.path.split(__file__)[1][0:-3]
@@ -30,7 +27,10 @@ pathlib.Path(cache_zip_dir).mkdir(parents=True, exist_ok=True)
 pae_tukutuku = 'http://www.nzdl.org'
 pae_tukutuku_haurua = '{}{}'.format(pae_tukutuku, '/gsdlmod?gg=text&e=p-00000-00---off-0niupepa--00-0----0-10-0---0---0direct-10---4-------0-1l--11-en-50---20-about---00-0-1-00-0-0-11-1-0utfZz-8-00-0-0-11-10-0utfZz-8-00&a=d&c=niupepa&cl=CL1')
 
-perehitanga_kōnae_ingoa = 'perehitanga_kuputohu.csv'
+
+NEWSPAPER_NAME_MATCHER = re.compile(r'(.*?) \d\d\d\d.*')
+NEWSPAPER_VOL_MATCHER = re.compile(r'(.*?) \d\d\d\d.*?Volume (\d+).*')
+NEWSPAPER_NO_MATCHER = re.compile(r'(.*?) \d\d\d\d.*?No. (\d+).*')
 
 
 class AutoSaveCache:
@@ -129,7 +129,7 @@ tohukī = "‘’\'\") "
 
 class Perehitanga:
     # This class takes a row from the index file it reads and attributes it to a class object for readability
-    def __init__(self, rārangi, mātāmuri_rārangi=None):
+    def __init__(self, rārangi):
         self.niupepa = rārangi[0]
         if len(rārangi) == 3:
             self.perehitanga = rārangi[1]
@@ -138,15 +138,8 @@ class Perehitanga:
             self.perehitanga = ''
             self.taukaea = rārangi[1]
 
-        if mātāmuri_rārangi:
-            self.mātāmuri_niupepa = mātāmuri_rārangi[1]
-            self.mātāmuri_perehitanga = mātāmuri_rārangi[2]
-            self.mātāmuri_hau = mātāmuri_rārangi[3]
-            self.mātāmuri_kupu = mātāmuri_rārangi[9]
-            self.mātāmuri_taukaea = mātāmuri_rārangi[10]
-            self.mātāmuri = True
-        else:
-            self.mātāmuri = False
+        self.mātāmuri = False
+        self.published_date = None
 
 
 class Rārangi:
@@ -156,6 +149,7 @@ class Rārangi:
     def __init__(self, url_querier: UrlQuerier, niupepa, taukaea):
         self.niupepa = niupepa.niupepa
         self.perehitanga = niupepa.perehitanga
+        self.published_date = niupepa.published_date
         self.taukaea = taukaea
         # Extracts the soup of the issue's first page
         self.hupa = bs(url_querier.query_or_load(self.taukaea), 'html.parser')
@@ -206,7 +200,7 @@ def mātītori_kupu(kupu):
     return re.findall(r'[\w\W]*?[{}][{}]*\n|[\w\W]+$'.format(tohutuhi, tohukī), kupu)
 
 
-def rāringa_kaituhituhi(tāuru, kaituhituhi, tīmata_kōwae):
+def rāringa_kaituhituhi(tāuru, tīmata_kōwae, store_page):
     # This function splits the text from a given page into its constituent
     # Paragraphs, and writes them along with the page's information (date
     # Retrieved, newspaper name, issue name, page number, Māori word count,
@@ -263,10 +257,12 @@ def rāringa_kaituhituhi(tāuru, kaituhituhi, tīmata_kōwae):
             tāuru.māori, tāuru.rangirua, tāuru.pākehā, tāuru.tapeke, tāuru.ōrau = tiki_ōrau(
                 tāuru.urutau)
             # Prepares the row that is to be written to the csv
-            rārangi = [datetime.now(), tāuru.niupepa, tāuru.perehitanga, whārangi_tau,
-                       tāuru.māori, tāuru.rangirua, tāuru.pākehā, tāuru.tapeke, tāuru.ōrau, tāuru.urutau, whārangi_taukaea, tāuru.kupu]
-            # Writes the date retrieved, newspaper name, issue name, page number, Māori percentage, extracted text and page url to the file
-            kaituhituhi.writerow(rārangi)
+
+            # ['newspaper', 'issue', 'page', 'māori_words', 'ambiguous_words', 'other_words',
+            #  'total_words', 'percent_māori', 'adapted_text', 'url', 'raw_text'])
+
+            store_page(tāuru.niupepa, tāuru.perehitanga, tāuru.published_date, whārangi_tau, tāuru.māori, tāuru.rangirua, tāuru.pākehā,
+                       tāuru.tapeke, tāuru.ōrau, tāuru.urutau, whārangi_taukaea, tāuru.kupu)
 
     return tīmata_kōwae
 
@@ -369,23 +365,93 @@ class Command(BaseCommand):
         super().__init__()
         cache_file = os.path.join(cache_dir, 'cache.pkl')
         self.cache = AutoSaveCache(cache_file, 10)
+
         self.browser_wrapper = BrowserWrapper(cache_dir)
         self.url_querier = UrlQuerier(self.cache, self.browser_wrapper)
+
+        self.progress_cache_file = os.path.join(cache_dir, 'progress.pkl')
+        if os.path.isfile(self.progress_cache_file):
+            with open(self.progress_cache_file, 'rb') as f:
+                self.progress_cache = pickle.load(f)
+        else:
+            self.progress_cache = dict()
+
+    def store_page(self, npp_name, issue, published_date, page_number, maori_words, ambiguous_words, other_words, total_words,
+                   percent_maori, adapted_text, url, raw_text):
+
+        full_title = npp_name + ' ' + issue
+        
+        name_matcher = NEWSPAPER_NAME_MATCHER.match(full_title)
+        if name_matcher is not None:
+            newspaper_title = name_matcher.group(1)
+        else:
+            raise Exception('Malform publication title {}'.format(full_title))
+        
+        vol_matcher = NEWSPAPER_VOL_MATCHER.match(full_title)
+        if vol_matcher is not None:
+            volume = int(vol_matcher.group(2))
+        else:
+            volume = None
+
+        no_matcher = NEWSPAPER_NO_MATCHER.match(full_title)
+        if no_matcher is not None:
+            number = int(no_matcher.group(2))
+        else:
+            number = None
+            
+        if len(published_date) == 8:
+            datetime_format = '%Y%m%d'
+        elif len(published_date) == 6:
+            datetime_format = '%Y%m'
+        elif len(published_date) == 4:
+            datetime_format = '%Y'
+        elif '-' in published_date:
+            published_date = published_date[:published_date.index('-')]
+            datetime_format = '%Y%m'
+        else:
+            raise ValueError('{} does not match any datetime format'.format(published_date))
+
+        published_date = datetime.datetime.strptime(published_date, datetime_format).date()
+
+        npp, _ = Newspaper.objects.get_or_create(name=newspaper_title)
+        pub, _ = Publication.objects.get_or_create(newspaper=npp, published_date=published_date,
+                                                volume=volume, number=number)
+
+        pg, _ = Page.objects.get_or_create(publication=pub, page_number=page_number)
+        pg.raw_text = raw_text
+        pg.adapted_text = adapted_text
+        pg.percentage_maori = percent_maori
+        pg.url = url
+
+        pg.maori_word_count = maori_words
+        pg.ambiguous_word_count = ambiguous_words
+        pg.other_word_count = other_words
+        pg.total_word_count = total_words
+
+        pg.save()
 
     def add_arguments(self, parser):
         parser.add_argument('--textfile', action='store', dest='textfile', required=False, type=str, default=None,
                             help="Output csv file where the date retrieved, newspaper names, issue names, page numbers,"
                                  " word counts, Māori percentage, page text and page urls are stored")
 
-    def hātepe_perehitanga(self, niupepa, kaituhituhi):
+    def hātepe_perehitanga(self, niupepa):
         # This function extracts the text from every page of the newspaper issue it
         # Has been passed, and gives it to the text csv writing function. The input
         # Is a Perehitanga class object with the newspaper name, issue name and
         # Issue url as attributes, the csv writer, and a variable to determine if it
         # Should write the text from the first page of the issue it extracts.
 
-        print("Collecting pages of " +
-              niupepa.perehitanga + " in " + niupepa.niupepa + ":\n")
+        newspaper_progress_cache = self.progress_cache.get(niupepa.niupepa, None)
+        if newspaper_progress_cache is None:
+            newspaper_progress_cache = []
+            self.progress_cache[niupepa.niupepa] = newspaper_progress_cache
+
+        if niupepa.perehitanga in newspaper_progress_cache:
+            print("Skip pages of " + niupepa.perehitanga + " in " + niupepa.niupepa + ":\n")
+            return
+
+        print("Collecting pages of " + niupepa.perehitanga + " in " + niupepa.niupepa + ":\n")
 
         # Passes the issue's information (Perehitanga class object) to the Rāringa class, as well as specifying which
         # page it should start from, as the process may have ended
@@ -396,7 +462,7 @@ class Command(BaseCommand):
         # If it hasn't been told to ignore the first page, it passes the information to the writing function
         if not niupepa.mātāmuri:
             print("Extracted page " + tāuru.tau)
-            rāringa_kaituhituhi(tāuru, kaituhituhi, tīmata_kōwae)
+            rāringa_kaituhituhi(tāuru, tīmata_kōwae, self.store_page)
         else:
             tāuru.kupu = mātītori_kupu(tāuru.kupu)[-1]
             tīmata_kōwae = kupu_moroki(tāuru, tīmata_kōwae)
@@ -410,6 +476,8 @@ class Command(BaseCommand):
             if taukaea_pinetohu.a == None:
                 print("\nFinished with " + niupepa.perehitanga +
                       " in " + niupepa.niupepa + "\n\n----------\n")
+
+                newspaper_progress_cache.append(niupepa.perehitanga)
                 return
 
             # If there is a link, its page number, soup and url are made into a tuple to be written to the csv
@@ -420,28 +488,19 @@ class Command(BaseCommand):
                 print("Extracted page " + tāuru.tau)
 
                 # Passes the tuple and csv writer to the csv writing function
-                tīmata_kōwae = rāringa_kaituhituhi(
-                    tāuru, kaituhituhi, tīmata_kōwae)
+                tīmata_kōwae = rāringa_kaituhituhi(tāuru, tīmata_kōwae, self.store_page)
 
             # If there is some other option, the function ends, to prevent an infinite loop.
             else:
                 print("\nError collecting all pages\n")
                 print("Finished with " + niupepa.perehitanga +
                       " in " + niupepa.niupepa + "\n\n----------\n")
+                newspaper_progress_cache.append(niupepa.perehitanga)
                 return
 
-    def tiki_niupepa(self, kōnae_ingoa, mātāmuri_rārangi=None):
+    def tiki_niupepa(self):
         # Collects the urls and names of all the newspapers
         # Opens the archive page and fetches the soup
-
-        kōnae = open(kōnae_ingoa, 'a')
-        kaituhituhi = csv.writer(kōnae)
-
-        if not mātāmuri_rārangi:  # If this evaluates as False, it means to start writing the file from scratch
-            # Writes the column names since the file did not exist
-            kaituhituhi.writerow(
-                ['date_retrieved', 'newspaper', 'issue', 'page', 'māori_words', 'ambiguous_words', 'other_words',
-                 'total_words', 'percent_māori', 'adapted_text', 'url', 'raw_text'])
 
         hupa = bs(self.url_querier.query_or_load(pae_tukutuku_haurua), 'html.parser')
 
@@ -453,17 +512,10 @@ class Command(BaseCommand):
                 elif td.text:
                     ingoa = td.text[:td.text.index(" (")].strip()
 
-            if mātāmuri_rārangi:
-                if ingoa != mātāmuri_rārangi[1]:
-                    continue
-            niupepa = Perehitanga([ingoa, taukaea], mātāmuri_rārangi)
-            if mātāmuri_rārangi:
-                mātāmuri_rārangi = None
-            self.tiki_perehitanga(niupepa, kaituhituhi)
+            niupepa = Perehitanga([ingoa, taukaea])
+            self.tiki_perehitanga(niupepa)
 
-        kōnae.close()
-
-    def tiki_perehitanga(self, niupepa, kaituhituhi):
+    def tiki_perehitanga(self, niupepa):
         # Collects the names and urls of each issue of a particular newspaper
         hupa = bs(self.url_querier.query_or_load(niupepa.taukaea), 'html.parser')
         print("\n\nCollecting issues of " +
@@ -478,6 +530,11 @@ class Command(BaseCommand):
                 elif "No." in td.text or "Volume" in td.text or " " in td.text:
                     # Makes sure text meets criteria, as there is some unwanted text. the second bracket is a specific case that doesn't get picked up by the first bracket
                     niupepa.perehitanga = td.text.strip()
+                    volumn_and_published_date = tr.text.strip()
+                    if volumn_and_published_date.index(niupepa.perehitanga) != 0:
+                        raise Exception('Volume row does not contain published date')
+                    niupepa.published_date = volumn_and_published_date[len(niupepa.perehitanga):].strip()
+
                 else:
                     pass
 
@@ -495,63 +552,22 @@ class Command(BaseCommand):
                     niupepa.mātāmuri = False
 
             # Then processes the issue
-            self.hātepe_perehitanga(niupepa, kaituhituhi)
+            self.hātepe_perehitanga(niupepa)
 
-    def matua(self, kōnae_ingoa):
-        # Starts recording the time to detail how long the entire process took
-        tāti_wā = time.time()
-
-        # Checks whether there is a csv of the text
-        if Path(kōnae_ingoa).exists():
-            with open(kōnae_ingoa, 'r') as kōnae:
-
-                kupuhou_kōnae = csv.reader(kōnae)
-                # Reads all the rows to a list
-                rārangi_tūtira = [rārangi for rārangi in kupuhou_kōnae]
-                kōnae.close()
-
-                # If the last row contains a valid url, this is the row we want to continue from. Else we continue from the second to last row.
-                if 'http://' and '=CL1' in rārangi_tūtira[-1][10]:
-                    mātāmuri_rārangi = rārangi_tūtira[-1]
-                elif len(rārangi_tūtira) > 2:
-                    mātāmuri_rārangi = rārangi_tūtira[-2]
-                else:
-                    mātāmuri_rārangi = None
-
-                # Gets the newspaper name, issue and page number of the last entry recorded. If the last one is as below, the file is up to date.
-                if mātāmuri_rārangi:
-                    if mātāmuri_rārangi[1:4] == ['Te Toa Takitini 1921-1932', 'Volume 1, No. 7', '96']:
-                        print("\nThere is nothing to read, data is already up to date.\n")
-                    else:
-                        # Otherwise, it passes where it was last up to to the text csv writer so it may continue from there
-                        print(
-                            "\nThe current text corpus is insufficient, rewriting file...")
-                        self.tiki_niupepa(kōnae_ingoa, mātāmuri_rārangi)
-                else:
-                    # Otherwise, it passes where it was last up to to the text csv writer so it may continue from there
-                    print("\nThe current text corpus is insufficient, rewriting file...")
-                    self.tiki_niupepa(kōnae_ingoa)
-
-        else:
-            print("\nThere is no current text corpus, collecting text...\n")
-            # If there is no text csv file, it begins to write one from scratch
-            self.tiki_niupepa(kōnae_ingoa)
-
-        print(
-            "\n\n----------\n\nAll text has been collected and analysed. The process took {:0.2f} seconds.\n".format(
-                time.time() - tāti_wā))  # Prints out how long the process took in a user friendly format
+    def matua(self):
+        self.tiki_niupepa()
 
     def finalise(self):
         self.cache.save()
+        with open(self.progress_cache_file, 'wb') as f:
+            pickle.dump(self.progress_cache, f)
 
     def handle(self, textfile, *args, **options):
-        kōnae_ingoa = textfile if textfile else os.path.join(cache_dir, perehitanga_kōnae_ingoa)
-
         self.browser_wrapper.auto_solve_captcha = True
         # self.populate()
 
         try:
-            self.matua(kōnae_ingoa)
+            self.matua()
         finally:
             self.finalise()
 

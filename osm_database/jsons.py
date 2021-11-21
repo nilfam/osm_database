@@ -31,8 +31,21 @@ tables = \
                     "is_attribute": True
                 },
                 {
-                    "name": "Content",
-                    "slug": "content",
+                    "name": "% Maori",
+                    "slug": "percentage_maori",
+                    "type": "FLOAT",
+                    "is_attribute": True,
+                },
+                {
+                    "name": "Original text",
+                    "slug": "raw_text",
+                    "type": "LONG_TEXT",
+                    "is_attribute": True,
+                    "editable": True,
+                },
+                {
+                    "name": "Adapted text",
+                    "slug": "adapted_text",
                     "type": "LONG_TEXT",
                     "is_attribute": True,
                     "editable": True,

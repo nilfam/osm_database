@@ -1,6 +1,8 @@
 import os
 import pathlib
 import pickle
+import pandas as pd
+from django.conf import settings
 
 from django.core.management import BaseCommand
 from progress.bar import Bar
@@ -24,11 +26,23 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         bar = Bar('Exporting', max=Page.objects.count())
         with open(self.export_file_name, 'w') as f:
-            for page in Page.objects.all():
-                text = page.content.strip()
-                if len(text) > 0:
-                    text = text.replace('\n', ' ').replace('- ', '')
-                    f.write(text)
-                    f.write('\n')
+            headers = ['Newspaper', 'Date', 'Volume', 'Number', 'Page No', 'Adapted Text', 'Raw Text', 'URL']
+            df = pd.DataFrame(columns=headers)
+            vl = Page.objects.all() \
+                .order_by('publication__id', 'publication__published_date', 'publication__volume', 'page_number') \
+                .values_list('publication__newspaper__name', 'publication__published_date', 'publication__volume',
+                             'publication__number', 'page_number', 'adapted_text', 'raw_text', 'url')
+
+            row_ind = 0
+            for npp_name, date, volume, number, pg_number, adapted_text, raw_text, url in vl:
+                df.loc[row_ind] = [npp_name, date.strftime(settings.DATE_INPUT_FORMAT), volume, number, pg_number, adapted_text, raw_text, url]
+                row_ind += 1
                 bar.next()
             bar.finish()
+
+            output_file = 'nzdl.xlsx'
+
+            writer = pd.ExcelWriter(output_file)
+            df.to_excel(excel_writer=writer, sheet_name='Sheet1', index=None)
+
+            writer.save()

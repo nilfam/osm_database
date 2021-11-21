@@ -23,18 +23,16 @@ class Publication(SimpleModel):
 
 class Page(SimpleModel):
     publication = models.ForeignKey(Publication, on_delete=models.CASCADE)
-    page_number = models.IntegerField()
-    content = models.TextField()
+    page_number = models.CharField(max_length=255)
+    raw_text = models.TextField()
     url = models.CharField(max_length=1024)
+
+    adapted_text = models.TextField()
+    percentage_maori = models.FloatField(null=True, blank=True)
+    maori_word_count = models.IntegerField(null=True, blank=True)
+    ambiguous_word_count = models.IntegerField(null=True, blank=True)
+    other_word_count = models.IntegerField(null=True, blank=True)
+    total_word_count = models.IntegerField(null=True, blank=True)
 
     def __str__(self):
         return '{}, Page {}'.format(self.publication, self.page_number)
-
-
-class Sentence(SimpleModel):
-    page = models.ForeignKey(Page, on_delete=models.CASCADE)
-    content = models.TextField()
-    percentage_maori = models.FloatField()
-
-    def __str__(self):
-        return '{}% {}'.format(self.content, self.percentage_maori)
