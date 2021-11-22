@@ -1,0 +1,50 @@
+# Database url:
+database_url: mysql://osm:osm@localhost:3306/osm?init_command=SET sql_mode='STRICT_TRANS_TABLES'
+
+language_code: 'en-nz'
+timezone: 'UTC'
+debug: True
+allowed_hosts:
+    - 'web1.localhost'
+    - 'localhost'
+    - '0.0.0.0'
+    - '127.0.0.1'
+
+site_url: 'http://127.0.0.1:8001/'
+email_config: 'smtp.gmail.com:koe.io.ac.nz:9BnpR%ebC#Tl!5d:465'
+from_email: 'koe.io.ac.nz@gmail.com'
+
+contact_emails:
+    - 'nishinokaze8@gmail.com'
+
+csrf_trusted_origin:
+    - '127.0.0.1'
+
+session_cookie_secure: False
+
+cache:
+    backend: 'django_redis.cache.RedisCache'
+    location: 'redis://localhost:6379/5'
+    options:
+        CLIENT_CLASS: 'django_redis.client.DefaultClient'
+        COMPRESSOR: 'django_redis.compressors.zlib.ZlibCompressor'
+        IGNORE_EXCEPTIONS: True
+        PASSWORD: 'abc123'
+
+
+broker:
+    location: 'redis://:abc123@localhost:6379/5'
+
+
+environment_variables:
+    WEBPACK_SERVER_PORT: 9875
+
+jupyter:
+    password: sha1:32666b16d662:f3327260b56c45effdc64acc6c331ec6305f137d
+    ip: '0.0.0.0'
+    port: 8002
+
+secret_key: r'ur3@h0h04@4e2_ll-_^($ksqja0q!38iwdjfd73$n+$k(f_i8k'
+
+path_to_mysql: mysql
+path_to_mysqldump: mysqldump

@@ -1,0 +1,49 @@
+# Use an official Python runtime as a base image
+FROM rappdw/docker-java-python as kojaapp
+
+MAINTAINER Yukio Fukuzawa
+
+ENV PYTHONUNBUFFERED 1
+
+ARG uid=1000
+
+ARG http_proxy=''
+ARG https_proxy=''
+ENV http_proxy=''
+ENV https_proxy=''
+ENV LANG C.UTF-8
+ENV LC_ALL C.UTF-8
+
+
+RUN echo "deb http://ftp.debian.org/debian stretch-backports main" >> /etc/apt/sources.list
+
+# Install extra packages.
+RUN apt-get update && apt-get install -y --no-install-recommends vim mariadb-client libxml2-dev libxmlsec1-dev && rm -rf /var/lib/apt/lists/*
+
+
+COPY requirements.txt /
+
+## Install any needed packages specified in requirements.txt
+RUN pip uninstall -y numpy scipy
+RUN pip install Cython numpy==1.19.5 scipy==1.2.1
+RUN pip install -r requirements.txt --no-cache-dir
+
+COPY requirements-basic.txt /
+RUN pip install -r requirements-basic.txt --no-cache-dir
+
+ENV JAVA_HOME=/usr/lib/jvm/zulu-11-amd64
+
+COPY requirements-production.txt /
+RUN pip install -r requirements-production.txt --no-cache-dir
+
+# Make port 8000 available to the world outside this container
+EXPOSE 8000
+
+WORKDIR /code
+
+COPY . .
+
+# COPY settings/settings-prod.yaml settings/settings.yaml
+
+ENTRYPOINT ["/bin/bash"]
+CMD ["run_app.sh"]

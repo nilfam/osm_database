@@ -4,19 +4,21 @@ This script will create all necessary stuff for the app to work.
 Including: - Generating a settings.yaml file with a random SECRET_KEY if this file does not exist,
            - Reset, backup, restore the database to fixtures or to sql dump
 """
-import collections
 import os
 import time
 from contextlib import contextmanager
 from shutil import copyfile
+from colorama import Fore, Back, Style, init as colorama_init
 
-import yaml
+import pureyaml
 from django.core.files.temp import NamedTemporaryFile
 
 try:
     from collections.abc import Callable  # noqa
 except ImportError:
     from collections import Callable  # noqa
+
+colorama_init()
 
 CONF = {}
 
@@ -28,9 +30,16 @@ def get_config():
     If the file is created, also generate and append the secret key to the end of it.
     :return: the config dictionary
     """
+
+    settings_file_name = os.environ.get('SETTINGS_FILE_NAME', None)
+    if settings_file_name is None:
+        settings_file_name = 'settings.yaml'
+
+    talk_to_user('Using settings: ' + settings_file_name)
+
     base_dir = os.path.dirname(os.path.abspath(__file__))
-    filename = os.path.join(base_dir, 'settings.yaml')
-    default_filename = os.path.join(base_dir, 'settings.default.yaml')
+    filename = os.path.join(base_dir, 'settings', settings_file_name)
+    default_filename = os.path.join(base_dir, 'settings', 'settings.default.yaml')
 
     if not os.path.isfile(filename):
         raise Exception('File {} not found, please make a copy of {}'.format(filename, default_filename))
@@ -39,7 +48,7 @@ def get_config():
         return CONF
 
     with open(filename, 'r', encoding='utf-8') as f:
-        conf = yaml.safe_load(f)
+        conf = pureyaml.load(f)
 
     if conf.get('secret_key', None) is None:
         import random
@@ -51,7 +60,7 @@ def get_config():
             f.write('secret_key: r\'{}\''.format(secret))
 
     with open(filename, 'r', encoding='utf-8') as f:
-        conf = yaml.safe_load(f)
+        conf = pureyaml.load(f)
 
     conf['base_dir'] = base_dir
     CONF.update(conf)
@@ -459,11 +468,12 @@ def wait_for_database():
     talk_to_user('Testing database connection...')
     probe_db_function = probe_db_functions[db_engine_short_name]
 
-    connectable = probe_db_function()
+    connectable, message = probe_db_function()
     while not connectable:
-        connectable = probe_db_function()
-        print('Connection is not ready, sleep for 1 sec')
+        talk_to_user('Connection is not ready, sleep for 1 sec')
+        talk_to_user('Message = {}'.format(message))
         time.sleep(1)
+        connectable, message = probe_db_function()
 
     return True, ''
 
@@ -526,10 +536,8 @@ def handle_function(func: Callable, *args, **kwargs):
 
 if __name__ == '__main__':
     import argparse
-    from colorama import Fore, Back, Style, init as colorama_init
     import dj_database_url
 
-    colorama_init()
     parser = argparse.ArgumentParser()
 
     parser.add_argument('--probe-database', dest='wait_db', action='store_true', default=False,
