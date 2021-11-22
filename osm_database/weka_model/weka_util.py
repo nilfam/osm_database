@@ -2,6 +2,7 @@ import os
 import pickle
 import re
 from logging import warning
+from zipfile import ZipFile
 
 import numpy as np
 import pandas as pd
@@ -63,15 +64,20 @@ class GloveEmbeddingExtraction:
 
     def construct_glove_dict(self, glove_file):
         glove_dict = {}
-        with open(glove_file, 'r', encoding="utf8") as f:
-            line = f.readline().strip()
-            while line:
-                parts = line.split(' ')
-                if len(parts) == self.glove_dims + 1:
-                    word = parts[0]
-                    values = list(map(float, parts[1:]))
-                    glove_dict[word] = np.array(values, dtype=np.float32)
+        glove_file_zip = glove_file + '.zip'
+        raw_glove_file_name = os.path.split(glove_file)[-1]
+        if not os.path.isfile(glove_file_zip):
+            raise Exception('File {} not found'.format(glove_file_zip))
+        with ZipFile(glove_file_zip, 'r') as z:
+            with z.open(raw_glove_file_name) as f:
                 line = f.readline().strip()
+                while line:
+                    parts = line.decode().split(' ')
+                    if len(parts) == self.glove_dims + 1:
+                        word = parts[0]
+                        values = list(map(float, parts[1:]))
+                        glove_dict[word] = np.array(values, dtype=np.float32)
+                    line = f.readline().strip()
         return glove_dict
 
     def split_parts(self, cleaned):

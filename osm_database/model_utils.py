@@ -1,16 +1,6 @@
-import os
-from collections import Counter
-
-import numpy as np
-from PIL import Image
-from django.conf import settings
 from django.db import models
-from scipy import signal
-from scipy.cluster.hierarchy import linkage
 
 from root.exceptions import CustomAssertionError
-from root.models import ExtraAttrValue
-from root.utils import ensure_parent_folder_exists
 
 
 def get_or_error(obj, key, errmsg=None):
