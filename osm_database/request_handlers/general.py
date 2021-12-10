@@ -11,6 +11,9 @@ __all__ = ['find_rel', 'find_locs', 'get_geojson_info']
 from weka_model.external_weka_util import weka_output_handle
 
 
+weka_stdev = 0.27
+
+
 def find_rel(request):
     relatum = get_or_error(request.POST, 'relatum')
     rel_objs = OsmEntity.objects.filter(
@@ -40,20 +43,21 @@ def find_locs(request):
     retval = []
     future = weka_output_handle(loc_type, preposition, entity.display_name, rlat, rlon, loc_type, entity.type)
     vicinity = future.result()
+    outer_vicinity = vicinity * (1 + weka_stdev)
+    inner_vicinity = vicinity * (1 - weka_stdev)
 
-    explanation = '<p>Based on the model, the expression "{} {} {}" yields distance {:.2f} meters, which is the ' \
-                  'radius of this circle shown here, centred on the relatum centroid. </p>' \
-                  '<p>Orange circles represents locatums of type {} that are found within this vicinity.</p>'\
+    explanation = '<p>Based on the model, the expression "{} {} {}" yields distance {:.2f} meters. ' \
+                  'The orange circles inside the donut show possible locations of type {} for the locatum.</p>'\
         .format(loc_type, preposition, entity.display_name, vicinity, loc_type)
-    retval.append({'id': 'vicinity', 'radius': vicinity, 'lat': rlat, 'lon': rlon, 'explanation': explanation})
+    retval.append({'id': 'vicinity', 'outer_radius': outer_vicinity, 'inner_radius': inner_vicinity, 'lat': rlat, 'lon': rlon, 'explanation': explanation})
 
-    min_lat, max_lat, min_lon, max_lon = find_max_deviation(float(entity.lat), float(entity.lon), 1000)
+    min_lat, max_lat, min_lon, max_lon = find_max_deviation(rlat, rlon, outer_vicinity)
     possible_locs = OsmEntity.objects.filter(lat__gte=min_lat, lat__lte=max_lat, lon__gte=min_lon, lon__lte=max_lon,
                                              type__icontains=loc_type).values_list('id', 'display_name', 'lat', 'lon')
 
     for id, dn, llat, llon in possible_locs:
         distance_c2c = geodesic((llat, llon), (rlat, rlon)).meters
-        if distance_c2c > vicinity:
+        if distance_c2c > outer_vicinity or distance_c2c < inner_vicinity:
             continue
 
         if llat > 10:

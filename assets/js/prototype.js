@@ -154,12 +154,18 @@ function addLocatumsToMap (geojson) {
 }
 
 function addVicinityToMap (vicinity) {
-    let geojsonObject = L.circle([vicinity.lat, vicinity.lon], vicinity.radius, {
-        stroke: "#000",
-        fillColor: "#B0DE5C",
-        weight: 2,
-        opacity: 1,
-        fillOpacity: 0.1
+    // let geojsonObject = L.circle([vicinity.lat, vicinity.lon], vicinity.radius, {
+    //     stroke: "#000",
+    //     fillColor: "#B0DE5C",
+    //     weight: 2,
+    //     opacity: 1,
+    //     fillOpacity: 0.1
+    // });
+
+    let geojsonObject = L.donut([vicinity.lat, vicinity.lon],{
+          radius: vicinity.outer_radius,
+          innerRadius: vicinity.inner_radius,
+          innerRadiusAsPercent: false,
     });
 
     geojsonObject.bindPopup(vicinity.explanation);
