@@ -11,7 +11,7 @@ __all__ = ['find_rel', 'find_locs', 'get_geojson_info']
 from weka_model.external_weka_util import weka_output_handle
 
 
-weka_stdev = 0.27
+weka_stdev = 0.24
 
 
 def find_rel(request):
