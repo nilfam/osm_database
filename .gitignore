@@ -10,7 +10,6 @@ user_data
 .venv
 assets/bundles
 *.pkl
-*.xls*
 *-stats.json
 mossop.db
 *.bak

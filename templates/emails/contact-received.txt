@@ -1,8 +1,0 @@
-{% load staticfiles %}
-{% load custom_tags %}
-Hi,
-"{{ name }} <{{ email }}>" just contacted Infocare with the following message:
-{{ message }}
-
-Best regards,
-The Infocare project
