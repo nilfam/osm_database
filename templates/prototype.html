@@ -15,7 +15,7 @@
 
 {% block main-content %}
     <nav id="controller" class="navbar navbar-default navbar-fixed-top">
-        <div class="container-fluid">
+        <div class="container-md">
             <!-- Brand and toggle get grouped for better mobile display -->
             <div class="navbar-header">
                 <a class="navbar-brand" href="#">
@@ -23,7 +23,7 @@
                 </a>
             </div>
 
-            <div id="search-form" class="navbar-form navbar-left" role="search">
+            <div id="search-form" class="navbar-form" role="search">
                 <div class="form-group">
                     <select id="locatum" name="locatum" class="custom-select">
                         <option selected disabled>Choose locatum type</option>
@@ -1346,10 +1346,20 @@
                         <option value="towards">towards</option>
                     </select>
                     <input id="relatum" name="relatum" type="text" class="form-control" placeholder="Relatum">
+                    <button id="submitBtn" type="button" class="btn btn-default">Submit</button>
                 </div>
-                <button id="submitBtn" type="button" class="btn btn-default">Submit</button>
             </div>
         </div><!-- /.container-fluid -->
     </nav>
     <div id="map"></div>
+    <div id="footer">
+    <span>
+        Copyright Ⓒ2020-2022
+        <a target="_blank" href="https://scholar.google.co.nz/citations?user=rRTEOVAAAAAJ">Niloofar Aflaki</a>
+        <a target="_blank" href="https://www.linkedin.com/in/niloofaraflaki/"><i class="fa fa-linkedin-square"></i></a>
+        and <a target="_blank" href="https://scholar.google.co.nz/citations?user=Rvj8EcEAAAAJ">Yukio Fukuzawa</a>
+        <a target="_blank" href="https://www.linkedin.com/in/yukiofukuzawa/"><i class="fa fa-linkedin-square"></i></a>.
+        All rights reserved.
+    </span>
+    </div>
 {% endblock %}

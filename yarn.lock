@@ -1414,7 +1414,7 @@ component-emitter@^1.2.1:
 components-font-awesome@^4.7.0:
   version "4.7.0"
   resolved "https://registry.yarnpkg.com/components-font-awesome/-/components-font-awesome-4.7.0.tgz#a7550094b6e2cb5cd7dce49c405771c533e9cfe1"
-  integrity sha1-p1UAlLbiy1zX3OScQFdxxTPpz+E=
+  integrity sha512-kwptdKxXBD4mMxQK5mv+5qzw0hIoxC6z30+obfZKJ4mEcaQRqXm7/S0Y87ENixy0GI77GyONPcEXvmVk2AulmA==
 
 compressible@~2.0.16:
   version "2.0.18"
@@ -2618,7 +2618,7 @@ font-awesome-webpack@0.0.5-beta.2:
 font-awesome@^4.7.0:
   version "4.7.0"
   resolved "https://registry.yarnpkg.com/font-awesome/-/font-awesome-4.7.0.tgz#8fa8cf0411a1a31afd07b06d2902bb9fc815a133"
-  integrity sha1-j6jPBBGhoxr9B7BtKQK7n8gVoTM=
+  integrity sha512-U6kGnykA/6bFmg1M/oT9EkFeIYv7JlX3bozwQJWiiLz6L0w3F5vBVPxHlwyX/vtNq1ckcpRKOB9f2Qal/VtFpg==
 
 for-in@^1.0.1, for-in@^1.0.2:
   version "1.0.2"
@@ -6960,3 +6960,8 @@ yargs@~3.10.0:
     cliui "^2.1.0"
     decamelize "^1.0.0"
     window-size "0.1.0"
+
+yarn@^1.22.17:
+  version "1.22.17"
+  resolved "https://registry.yarnpkg.com/yarn/-/yarn-1.22.17.tgz#bf910747d22497b573131f7341c0e1d15c74036c"
+  integrity sha512-H0p241BXaH0UN9IeH//RT82tl5PfNraVpSpEoW+ET7lmopNC61eZ+A+IDvU8FM6Go5vx162SncDL8J1ZjRBriQ==

@@ -2,11 +2,49 @@
 @import "../../../node_modules/bootswatch/simplex/_variables.scss";
 
 $navbar-height: 42px;
+$footer-height: 40px;
+
+#search-form {
+  display: flex;
+  justify-content: flex-end;
+
+  .dropdown {
+    width: unset;
+  }
+
+  .bootstrap-select > .dropdown-toggle.bs-placeholder, .bootstrap-select > .dropdown-toggle.bs-placeholder:active, .bootstrap-select > .dropdown-toggle.bs-placeholder:focus, .bootstrap-select > .dropdown-toggle.bs-placeholder:hover {
+    color: white;
+  }
+
+  .dropdown-menu > .active > a, .dropdown-menu > .active > a:hover, .dropdown-menu > .active > a:focus {
+    color: white;
+  }
+}
 
 #map {
-  height: calc(100vh - #{$navbar-height});
+  height: calc(100vh - #{$navbar-height} - #{$footer-height});
   width: 100%;
   margin-top: $navbar-height;
+}
+
+#footer {
+  height: $footer-height;
+  width: 100%;
+  text-align: center;
+  display: flex;
+  justify-content: center;
+  flex-direction: column;
+  background-color: $gray-darker;
+  color: white;
+
+  .fa-linkedin-square {
+    color: #0072b1;
+  }
+
+  a {
+    color: unset;
+    text-decoration: underline;
+  }
 }
 
 #controller {
