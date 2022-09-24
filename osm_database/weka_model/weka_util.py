@@ -60,7 +60,7 @@ class GloveEmbeddingExtraction:
         else:
             self.glove_dict = self.construct_glove_dict(glove_file)
             with open(cache_file, 'wb') as f:
-                pickle.dump(self.glove_dict, f, pickle.HIGHEST_PROTOCOL)
+                pickle.dump(self.glove_dict, f, pickle.DEFAULT_PROTOCOL)
 
     def construct_glove_dict(self, glove_file):
         glove_dict = {}
